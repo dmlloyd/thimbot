@@ -21,6 +21,7 @@ package com.flurg.thimbot.raw;
 import com.flurg.thimbot.Charsets;
 import com.flurg.thimbot.Priority;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -102,7 +103,6 @@ public final class LineProtocolConnection<T> {
                 final Object lock = LineProtocolConnection.this.lock;
                 LineOutputCallback<T> callback;
                 boolean shutdown = false;
-                final boolean[] written = new boolean[1];
 
                 for (;;) {
                     synchronized (lock) {
@@ -147,40 +147,11 @@ public final class LineProtocolConnection<T> {
                         } while (callback == null);
                     }
                     try {
-                        written[0] = false;
-                        callback.writeLine(context, new ByteOutput() {
-                            public void write(final StringEmitter emitter) throws IOException {
-                                emitter.emit(this);
-                            }
-
-                            public void write(final String string, final Charset charset) throws IOException {
-                                write(string.getBytes(charset));
-                            }
-
-                            public void write(final String string) throws IOException {
-                                write(string.getBytes(Charsets.US_ASCII));
-                            }
-
-                            public void write(final int b) throws IOException {
-                                written[0] = true;
-                                outputStream.write(b == 10 || b == 13 ? 32 : b);
-                            }
-
-                            public void write(final byte[] b) throws IOException {
-                                write(b, 0, b.length);
-                            }
-
-                            public void write(final byte[] b, final int offs, final int len) throws IOException {
-                                written[0] |= len > 0;
-                                for (int i = 0; i < len; i ++) {
-                                    if (b[i] == 10 || b[i] == 13) {
-                                        b[i] = 32;
-                                    }
-                                }
-                                outputStream.write(b, offs, len);
-                            }
-                        }, seq);
-                        if (written[0]) {
+                        final ByteArrayOutput byteOutput = new ByteArrayOutput();
+                        callback.writeLine(context, byteOutput, seq);
+                        if (byteOutput.isWritten()) {
+                            System.out.printf("<<< %s%n", byteOutput.toString("UTF-8"));
+                            byteOutput.writeTo(outputStream);
                             outputStream.write(13);
                             outputStream.write(10);
                             outputStream.flush();
@@ -283,6 +254,41 @@ public final class LineProtocolConnection<T> {
         synchronized (lock) {
             shutdown = true;
             lock.notify();
+        }
+    }
+
+    static final class ByteArrayOutput extends ByteArrayOutputStream implements ByteOutput {
+
+        ByteArrayOutput() {
+        }
+
+        public void write(final StringEmitter emitter) throws IOException {
+            emitter.emit(this);
+        }
+
+        public void write(final String string, final Charset charset) throws IOException {
+            write(string.getBytes(charset));
+        }
+
+        public void write(final String string) throws IOException {
+            write(string.getBytes(Charsets.US_ASCII));
+        }
+
+        public void write(final int b) {
+            super.write(b == 10 || b == 13 ? 32 : b);
+        }
+
+        public void write(final byte[] b, final int offs, final int len) {
+            for (int i = 0; i < len; i ++) {
+                if (b[i] == 10 || b[i] == 13) {
+                    b[i] = 32;
+                }
+            }
+            super.write(b, offs, len);
+        }
+
+        boolean isWritten() {
+            return count > 0;
         }
     }
 }

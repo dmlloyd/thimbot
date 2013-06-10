@@ -179,6 +179,10 @@ public final class ThimBot {
     }
 
     public void sendMessage(final Priority priority, final Target target, final String message) throws IOException {
+        if (message.isEmpty()) {
+            new Throwable("Empty message being emitted").printStackTrace();
+            return;
+        }
         final Preferences preferences = target.getPreferences(prefs);
         final String encoding = preferences.get("encoding", "UTF-8");
         final StringEmitter contents = new StringEmitter(message, encoding);
