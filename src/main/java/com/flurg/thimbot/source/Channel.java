@@ -35,6 +35,12 @@ public class Channel implements FullTarget {
     private final String name;
 
     public Channel(final String name) {
+        if (name == null) {
+            throw new IllegalArgumentException("name is null");
+        }
+        if (name.isEmpty() || name.charAt(0) != '#' || name.charAt(0) != '&') {
+            throw new IllegalArgumentException("name '" + name + "' is not a valid channel name");
+        }
         this.name = name;
         nameEmitter = new StringEmitter(name);
     }
