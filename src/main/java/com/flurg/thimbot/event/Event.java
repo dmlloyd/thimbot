@@ -18,62 +18,49 @@
 
 package com.flurg.thimbot.event;
 
+import java.util.Arrays;
+
 import com.flurg.thimbot.ThimBot;
-import com.flurg.thimbot.source.Source;
-import com.flurg.thimbot.source.Target;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public abstract class Event {
+public abstract class Event implements CommonEvent {
 
-    public interface To<T extends Target> {
-        T getTarget();
-
-        boolean isToMe();
-    }
-
-    public interface From<T extends Source> {
-        T getSource();
-
-        boolean isFromMe();
-    }
-
-    public interface Regarding<T extends Target> {
-        T getRegarding();
-
-        boolean isRegardingMe();
-    }
-
-    private final int seq;
     private final ThimBot bot;
 
+    private final long seq;
+    private final long clockTime;
+
     protected Event(final ThimBot bot) {
-        this.seq = bot.getEventSequence();
         this.bot = bot;
+        clockTime = System.currentTimeMillis();
+        seq = bot.getEventSequence();
     }
 
-    public int getSeq() {
+    public long getSeq() {
         return seq;
+    }
+
+    public long getClockTime() {
+        return clockTime;
     }
 
     public ThimBot getBot() {
         return bot;
     }
 
-    public abstract void dispatch(EventHandlerContext context, EventHandler handler) throws Exception;
-
     public String toString() {
         StringBuilder b = new StringBuilder();
         b.append(getClass().getSimpleName());
-        if (this instanceof From) {
-            b.append(" from ").append(((From<?>)this).getSource());
+        if (this instanceof FromUserEvent) {
+            b.append(" from ").append(((FromUserEvent)this).getFromNick());
         }
-        if (this instanceof To) {
-            b.append(" to ").append(((To<?>)this).getTarget());
+        if (this instanceof MultiTargetEvent) {
+            b.append(" to ").append(Arrays.toString(((MultiTargetEvent)this).getTargets().toArray()));
         }
-        if (this instanceof Regarding) {
-            b.append(" regarding ").append(((Regarding<?>)this).getRegarding());
+        if (this instanceof MessageRespondableEvent) {
+            b.append(" responses to ").append(Arrays.toString(((MessageRespondableEvent)this).getResponseTargets()));
         }
         return b.toString();
     }

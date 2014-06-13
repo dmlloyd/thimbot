@@ -23,7 +23,7 @@ import com.flurg.thimbot.ThimBot;
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class DisconnectEvent extends Event {
+public final class DisconnectEvent extends Event implements InboundEvent {
 
     public DisconnectEvent(final ThimBot bot) {
         super(bot);

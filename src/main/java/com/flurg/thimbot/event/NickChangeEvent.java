@@ -19,37 +19,40 @@
 package com.flurg.thimbot.event;
 
 import com.flurg.thimbot.ThimBot;
-import com.flurg.thimbot.source.Nick;
-import com.flurg.thimbot.source.User;
+import com.flurg.thimbot.util.IRCStringUtil;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class NickChangeEvent extends Event implements Event.From<User>, Event.Regarding<Nick> {
+public final class NickChangeEvent extends Event implements FromUserEvent, InboundEvent {
 
-    private final User source;
-    private final Nick regarding;
+    private final String nick;
+    private final String user;
+    private final String newNick;
+    private final boolean fromMe;
 
-    public NickChangeEvent(final ThimBot bot, final User source, final Nick regarding) {
+    public NickChangeEvent(final ThimBot bot, final String user, final String newNick) {
         super(bot);
-        this.source = source;
-        this.regarding = regarding;
+        this.user = user;
+        nick = IRCStringUtil.nickOf(user);
+        this.newNick = newNick;
+        fromMe = getBot().getBotNick().equals(nick);
     }
 
-    public User getSource() {
-        return source;
+    public String getFromNick() {
+        return nick;
     }
 
-    public Nick getRegarding() {
-        return regarding;
+    public String getFromUser() {
+        return user;
+    }
+
+    public String getNewNick() {
+        return newNick;
     }
 
     public boolean isFromMe() {
-        return getBot().getBotNick().equals(source.getNick());
-    }
-
-    public boolean isRegardingMe() {
-        return getBot().getBotNick().equals(regarding);
+        return fromMe;
     }
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {

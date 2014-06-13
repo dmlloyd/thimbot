@@ -23,7 +23,7 @@ import com.flurg.thimbot.ThimBot;
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class ServerPongEvent extends Event {
+public final class ServerPongEvent extends Event implements InboundEvent {
     private final String payload;
 
     public ServerPongEvent(final ThimBot bot, final String payload) {

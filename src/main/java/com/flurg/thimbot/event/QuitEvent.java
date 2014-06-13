@@ -19,22 +19,26 @@
 package com.flurg.thimbot.event;
 
 import com.flurg.thimbot.ThimBot;
-import com.flurg.thimbot.source.User;
+import com.flurg.thimbot.util.IRCStringUtil;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class QuitEvent extends Event implements Event.From<User> {
+public final class QuitEvent extends Event implements FromUserEvent, InboundEvent {
 
-    private final User source;
+    private final String nick;
+    private final String user;
     private final String rawReason;
     private final String reason;
+    private final boolean fromMe;
 
-    public QuitEvent(final ThimBot bot, final User source, final String rawReason) {
+    public QuitEvent(final ThimBot bot, final String user, final String rawReason) {
         super(bot);
-        this.source = source;
+        this.user = user;
+        nick = IRCStringUtil.nickOf(user);
         this.rawReason = rawReason;
-        reason = MessageUtil.deformat(rawReason);
+        reason = IRCStringUtil.deformat(rawReason);
+        fromMe = getBot().getBotNick().equals(nick);
     }
 
     public String getReason() {
@@ -45,12 +49,16 @@ public final class QuitEvent extends Event implements Event.From<User> {
         return rawReason;
     }
 
-    public User getSource() {
-        return source;
+    public String getFromNick() {
+        return nick;
+    }
+
+    public String getFromUser() {
+        return user;
     }
 
     public boolean isFromMe() {
-        return getBot().getBotNick().equals(source.getNick());
+        return fromMe;
     }
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {

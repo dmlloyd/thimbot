@@ -18,60 +18,153 @@
 
 package com.flurg.thimbot;
 
-import com.flurg.thimbot.event.ActionEvent;
-import com.flurg.thimbot.event.CTCPCommandEvent;
-import com.flurg.thimbot.event.CTCPResponseEvent;
+import com.flurg.thimbot.event.AccountChangeEvent;
+import com.flurg.thimbot.event.AuthenticationChallengeEvent;
+import com.flurg.thimbot.event.AuthenticationFailedEvent;
+import com.flurg.thimbot.event.IRCBase64;
+import com.flurg.thimbot.event.LoggedInEvent;
+import com.flurg.thimbot.event.ChannelCTCPCommandEvent;
+import com.flurg.thimbot.event.ChannelCTCPResponseEvent;
+import com.flurg.thimbot.event.CapabilityAckEvent;
+import com.flurg.thimbot.event.CapabilityListEvent;
+import com.flurg.thimbot.event.CapabilityNakEvent;
 import com.flurg.thimbot.event.ChannelJoinEvent;
+import com.flurg.thimbot.event.ChannelMessageEvent;
+import com.flurg.thimbot.event.ChannelNoticeEvent;
 import com.flurg.thimbot.event.ChannelPartEvent;
 import com.flurg.thimbot.event.ErrorEvent;
+import com.flurg.thimbot.event.Event;
+import com.flurg.thimbot.event.LoggedOutEvent;
 import com.flurg.thimbot.event.MOTDEndEvent;
 import com.flurg.thimbot.event.MOTDLineEvent;
-import com.flurg.thimbot.event.MessageEvent;
 import com.flurg.thimbot.event.NickChangeEvent;
-import com.flurg.thimbot.event.NoticeEvent;
-import com.flurg.thimbot.event.PingEvent;
-import com.flurg.thimbot.event.PongEvent;
+import com.flurg.thimbot.event.PrivateCTCPCommandEvent;
+import com.flurg.thimbot.event.PrivateCTCPResponseEvent;
+import com.flurg.thimbot.event.PrivateMessageEvent;
+import com.flurg.thimbot.event.PrivateNoticeEvent;
 import com.flurg.thimbot.event.QuitEvent;
 import com.flurg.thimbot.event.ServerPingEvent;
 import com.flurg.thimbot.event.ServerPongEvent;
+import com.flurg.thimbot.event.UserAwayEvent;
+import com.flurg.thimbot.event.UserBackEvent;
+import com.flurg.thimbot.event.UserPongEvent;
+import com.flurg.thimbot.raw.EmittableByteArrayOutputStream;
 import com.flurg.thimbot.raw.LineListener;
 import com.flurg.thimbot.raw.LineProtocolConnection;
-import com.flurg.thimbot.source.Channel;
-import com.flurg.thimbot.source.FullTarget;
-import com.flurg.thimbot.source.HalfOpsInChannel;
-import com.flurg.thimbot.source.Nick;
-import com.flurg.thimbot.source.OpsInChannel;
-import com.flurg.thimbot.source.Source;
-import com.flurg.thimbot.source.User;
-import com.flurg.thimbot.source.VoicedInChannel;
+import com.flurg.thimbot.util.IRCStringUtil;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 
 /**
 * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
 */
 @SuppressWarnings("SpellCheckingInspection")
-class IRCParser implements LineListener<ThimBot> {
-    private final Source serverSource;
-    private final StringBuilder b = new StringBuilder();
+class IRCParser implements LineListener {
 
-    IRCParser(final Source serverSource) {
-        this.serverSource = serverSource;
+    private static final byte[] NO_BYTES = new byte[0];
+
+    private final StringBuilder b = new StringBuilder();
+    private final EmittableByteArrayOutputStream authBlock = new EmittableByteArrayOutputStream();
+
+    IRCParser() {
     }
 
     public void handleLine(final ThimBot bot, final LineProtocolConnection connection, final byte[] buffer, final int offs, final int len) {
         final Input is = new Input(buffer, offs, len);
         int ch;
-        final Source source = parsePrefix(is);
+        final String source = parsePrefix(is);
         final String command = tokenize(is, ' ');
         switch (command) {
+            case "CAP": {
+                tokenize(is, ' ');
+                final String subCommand = tokenize(is, ' ');
+                switch (subCommand) {
+                    case "LIST":
+                    case "LS": {
+                        if (is.read() == ':') {
+                            ArrayList<String> list = new ArrayList<>();
+                            String s;
+                            while (! (s = tokenize(is, ' ')).isEmpty()) {
+                                list.add(s);
+                            }
+                            final CapabilityListEvent event = new CapabilityListEvent(bot, list);
+                            bot.dispatch(event);
+                        }
+                        break;
+                    }
+                    case "ACK": {
+                        if (is.read() == ':') {
+                            ArrayList<String> list = new ArrayList<>();
+                            String s;
+                            while (! (s = tokenize(is, ' ')).isEmpty()) {
+                                list.add(s);
+                            }
+                            final CapabilityAckEvent event = new CapabilityAckEvent(bot, list);
+                            bot.dispatch(event);
+                            break;
+                        }
+                    }
+                    case "NAK": {
+                        final CapabilityNakEvent event = new CapabilityNakEvent(bot);
+                        bot.dispatch(event);
+                        break;
+                    }
+                }
+                break;
+            }
+            case "ACCOUNT": {
+                if (IRCStringUtil.isUser(source)) {
+                    final AccountChangeEvent event = new AccountChangeEvent(bot, source, tokenize(is, ' '));
+                    bot.dispatch(event);
+                }
+                break;
+            }
+            case "AUTHENTICATE": {
+                final String base64 = is.getRemaining(bot.getCharset());
+                if (base64.equals("+")) {
+                    final AuthenticationChallengeEvent event = new AuthenticationChallengeEvent(bot, NO_BYTES);
+                    bot.dispatch(event);
+                } else if (base64.length() == 400) {
+                    try {
+                        IRCBase64.decode(base64, 0, authBlock);
+                    } catch (IOException e) {
+                        throw new IllegalStateException();
+                    }
+                } else {
+                    try {
+                        IRCBase64.decode(base64, 0, authBlock);
+                    } catch (IOException e) {
+                        throw new IllegalStateException();
+                    }
+                    final AuthenticationChallengeEvent event = new AuthenticationChallengeEvent(bot, authBlock.toByteArray());
+                    bot.dispatch(event);
+                    authBlock.reset();
+                }
+                break;
+            }
+            case "AWAY": {
+                if (IRCStringUtil.isUser(source)) {
+                    if (is.read() == ':') {
+                        final UserAwayEvent event = new UserAwayEvent(bot, source, is.getRemaining(bot.getCharset()));
+                        bot.dispatch(event);
+                    } else {
+                        final UserBackEvent event = new UserBackEvent(bot, source);
+                        bot.dispatch(event);
+                    }
+                }
+                break;
+            }
             case "INVITE": {
                 break;
             }
             case "JOIN": {
-                if (source instanceof User) {
-                    bot.dispatch(new ChannelJoinEvent(bot, (User) source, new Channel(tokenize(is, ' '))));
+                if (IRCStringUtil.isUser(source)) {
+                    final ChannelJoinEvent event = new ChannelJoinEvent(bot, source, tokenize(is, ' '));
+                    bot.dispatch(event);
                 }
                 break;
             }
@@ -82,55 +175,56 @@ class IRCParser implements LineListener<ThimBot> {
                 break;
             }
             case "NICK": {
-                if (source instanceof User && is.read() == ':') {
-                    bot.dispatch(new NickChangeEvent(bot, (User) source, new Nick(tokenize(is, ' '))));
+                if (IRCStringUtil.isUser(source) && is.read() == ':') {
+                    final NickChangeEvent event = new NickChangeEvent(bot, source, tokenize(is, ' '));
+                    bot.dispatch(event);
                 }
                 break;
             }
             case "NOTICE": {
-                if (source instanceof User) {
-                    final User user = (User) source;
-                    final FullTarget target;
+                if (IRCStringUtil.isUser(source)) {
                     is.mark(0);
                     ch = is.read();
-                    if (ch == '+') {
-                        target = new VoicedInChannel(new Channel(tokenize(is, ' ')));
-                    } else if (ch == '%') {
-                        target = new HalfOpsInChannel(new Channel(tokenize(is, ' ')));
-                    } else if (ch == '@') {
-                        target = new OpsInChannel(new Channel(tokenize(is, ' ')));
-                    } else if (ch == '#' || ch == '!' || ch == '&') {
-                        is.reset();
-                        target = new Channel(tokenize(is, ' '));
-                    } else {
-                        is.reset();
-                        target = new Nick(tokenize(is, ' '));
-                    }
+                    final String target = tokenize(is, ' ');
                     if (is.read() == ':') {
                         is.mark(0);
                         if (is.read() == 1) {
                             final String subcommand = tokenize(is, ' ');
                             switch (subcommand) {
                                 case "PONG": {
-                                    bot.dispatch(new PongEvent(bot, user, target, tokenize(is, (char)1)));
+                                    final UserPongEvent event = new UserPongEvent(bot, source, tokenize(is, (char) 1));
+                                    bot.dispatch(event);
                                     break;
                                 }
                                 default: {
-                                    bot.dispatch(new CTCPResponseEvent(bot, user, target, tokenize(is, ' '), tokenize(is, (char)1)));
+                                    final Event event;
+                                    if (IRCStringUtil.isChannel(target)) {
+                                        event = new ChannelCTCPResponseEvent(bot, source, target, tokenize(is, ' '), tokenize(is, (char) 1));
+                                    } else {
+                                        event = new PrivateCTCPResponseEvent(bot, source, tokenize(is, ' '), tokenize(is, (char) 1));
+                                    }
+                                    bot.dispatch(event);
                                     break;
                                 }
                             }
                         } else {
                             is.reset();
-                            bot.dispatch(new NoticeEvent(bot, user, target, is.getRemaining(bot.getCharset(target))));
+                            final Event event;
+                            if (IRCStringUtil.isChannel(target)) {
+                                event = new ChannelNoticeEvent(bot, source, target, is.getRemaining(bot.getCharset()));
+                            } else {
+                                event = new PrivateNoticeEvent(bot, source, is.getRemaining(bot.getCharset()));
+                            }
+                            bot.dispatch(event);
                         }
                     }
                 }
                 break;
             }
             case "PART": {
-                if (source instanceof User) {
-                    bot.dispatch(new ChannelPartEvent(bot, (User) source, new Channel(tokenize(is, ' ')), is.read() == ':' ? is.getRemaining(bot.getCharset(((User) source).getNick())) : ""));
+                if (IRCStringUtil.isUser(source)) {
+                    final ChannelPartEvent event = new ChannelPartEvent(bot, source, tokenize(is, ' '), is.read() == ':' ? is.getRemaining(bot.getCharset()) : "");
+                    bot.dispatch(event);
                 }
                 break;
             }
@@ -143,7 +237,7 @@ class IRCParser implements LineListener<ThimBot> {
                     is.mark(0);
                     ch = is.read();
                 }
-                final ServerPingEvent event = new ServerPingEvent(bot, is.getRemaining(Charsets.LATIN_1));
+                final ServerPingEvent event = new ServerPingEvent(bot, is.getRemaining(StandardCharsets.ISO_8859_1));
                 bot.dispatch(event);
                 break;
             }
@@ -156,69 +250,66 @@ class IRCParser implements LineListener<ThimBot> {
                     is.mark(0);
                     ch = is.read();
                 }
-                bot.dispatch(new ServerPongEvent(bot, is.getRemaining(Charsets.LATIN_1)));
+                final ServerPongEvent event = new ServerPongEvent(bot, is.getRemaining(StandardCharsets.ISO_8859_1));
+                bot.dispatch(event);
                 break;
             }
             case "PRIVMSG": {
-                if (source instanceof User) {
-                    final User user = (User) source;
-                    final FullTarget target;
+                if (IRCStringUtil.isUser(source)) {
                     is.mark(0);
                     ch = is.read();
-                    if (ch == '+') {
-                        target = new VoicedInChannel(new Channel(tokenize(is, ' ')));
-                    } else if (ch == '%') {
-                        target = new HalfOpsInChannel(new Channel(tokenize(is, ' ')));
-                    } else if (ch == '@') {
-                        target = new OpsInChannel(new Channel(tokenize(is, ' ')));
-                    } else if (ch == '#' || ch == '!' || ch == '&') {
-                        is.reset();
-                        target = new Channel(tokenize(is, ' '));
-                    } else {
-                        is.reset();
-                        target = new Nick(tokenize(is, ' '));
-                    }
+                    final String target = tokenize(is, ' ');
                     if (is.read() == ':') {
                         is.mark(0);
                         if (is.read() == 1) {
                             final String subcommand = tokenize(is, ' ');
                             switch (subcommand) {
-                                case "ACTION": {
-                                    bot.dispatch(new ActionEvent(bot, user, target, tokenize(is, (char)1)));
-                                    break;
-                                }
-                                case "PING": {
-                                    bot.dispatch(new PingEvent(bot, user, target, tokenize(is, (char)1)));
+                                case "PONG": {
+                                    final UserPongEvent event = new UserPongEvent(bot, source, tokenize(is, (char) 1));
+                                    bot.dispatch(event);
                                     break;
                                 }
                                 default: {
-                                    bot.dispatch(new CTCPCommandEvent(bot, user, target, tokenize(is, ' '), tokenize(is, (char)1)));
+                                    final Event event;
+                                    if (IRCStringUtil.isChannel(target)) {
+                                        event = new ChannelCTCPCommandEvent(bot, source, target, tokenize(is, ' '), tokenize(is, (char) 1));
+                                    } else {
+                                        event = new PrivateCTCPCommandEvent(bot, source, tokenize(is, ' '), tokenize(is, (char) 1));
+                                    }
+                                    bot.dispatch(event);
                                     break;
                                 }
                             }
                         } else {
                             is.reset();
-                            bot.dispatch(new MessageEvent(bot, user, target, is.getRemaining(bot.getCharset(target))));
+                            final Event event;
+                            if (IRCStringUtil.isChannel(target)) {
+                                event = new ChannelMessageEvent(bot, source, target, is.getRemaining(bot.getCharset()));
+                            } else {
+                                event = new PrivateMessageEvent(bot, source, is.getRemaining(bot.getCharset()));
+                            }
+                            bot.dispatch(event);
                         }
                     }
                 }
                 break;
             }
             case "QUIT": {
-                if (source instanceof User) {
-                    final User user = (User) source;
+                if (IRCStringUtil.isUser(source)) {
                     final String reason;
                     if (is.read() == ':') {
-                        reason = is.getRemaining(bot.getCharset(user.getNick()));
+                        reason = is.getRemaining(bot.getCharset());
                     } else {
                         reason = "";
                     }
-                    bot.dispatch(new QuitEvent(bot, user, reason));
+                    final QuitEvent event = new QuitEvent(bot, source, reason);
+                    bot.dispatch(event);
                 }
                 break;
             }
             case "ERROR": {
-                bot.dispatch(new ErrorEvent(bot, is.getRemaining(bot.getCharset())));
+                final ErrorEvent event = new ErrorEvent(bot, is.getRemaining(bot.getCharset()));
+                bot.dispatch(event);
                 break;
             }
             case "TOPIC": {
@@ -373,24 +464,74 @@ class IRCParser implements LineListener<ThimBot> {
             }
 
             case "375": { // RPL_MOTDSTART: :- <server> blah MOTD
-                final String nick = tokenize(is, ' ');
+                tokenize(is, ' ');
                 if (is.read() == ':') {
-                    bot.dispatch(new MOTDLineEvent(bot, is.getRemaining(bot.getCharset())));
+                    final MOTDLineEvent event = new MOTDLineEvent(bot, is.getRemaining(bot.getCharset()));
+                    bot.dispatch(event);
                 }
                 break;
             }
             case "372": { // RPL_MOTD: :- <text>
-                final String nick = tokenize(is, ' ');
+                tokenize(is, ' ');
                 if (is.read() == ':') {
-                    bot.dispatch(new MOTDLineEvent(bot, is.getRemaining(bot.getCharset())));
+                    final MOTDLineEvent event = new MOTDLineEvent(bot, is.getRemaining(bot.getCharset()));
+                    bot.dispatch(event);
                 }
                 break;
             }
             case "376": { // RPL_ENDOFMOTD: :End of /MOTD
-                final String nick = tokenize(is, ' ');
-                bot.dispatch(new MOTDEndEvent(bot));
+                tokenize(is, ' ');
+                final MOTDEndEvent event = new MOTDEndEvent(bot);
+                bot.dispatch(event);
                 break;
             }
+            case "670": { // RPL_STARTTLS
+                // todo
+                // SSLSocketFactory f = ...;
+                // socket = f.createSocket(socket, host, port, true);
+                break;
+            }
+            case "900": { // RPL_LOGGEDIN
+                tokenize(is, ' ');
+                if (is.read() == ':') {
+                    bot.dispatch(new LoggedInEvent(bot, is.getRemaining(bot.getCharset())));
+                } else {
+                    bot.dispatch(new LoggedInEvent(bot, ""));
+                }
+                break;
+            }
+            case "901": { // RPL_LOGGEDOUT
+                tokenize(is, ' ');
+                if (is.read() == ':') {
+                    bot.dispatch(new LoggedOutEvent(bot, is.getRemaining(bot.getCharset())));
+                } else {
+                    bot.dispatch(new LoggedOutEvent(bot, ""));
+                }
+                break;
+            }
+            case "902": // ERR_NICKLOCKED
+            case "904": // ERR_SASLFAIL
+            case "905": // ERR_SASLTOOLONG
+            case "906": // ERR_SASLABORTED
+            case "907": { // ERR_SASLALREADY
+                tokenize(is, ' ');
+                if (is.read() == ':') {
+                    bot.dispatch(new AuthenticationFailedEvent(bot, is.getRemaining(bot.getCharset())));
+                } else {
+                    bot.dispatch(new AuthenticationFailedEvent(bot, ""));
+                }
+                break;
+            }
+            case "903": { // RPL_SASLSUCCESS
+                tokenize(is, ' ');
+                if (is.read() == ':') {
+                    bot.dispatch(new LoggedInEvent(bot, is.getRemaining(bot.getCharset())));
+                } else {
+                    bot.dispatch(new LoggedInEvent(bot, ""));
+                }
+                break;
+            }
+
             default: { // unknown
                 break;
             }
@@ -414,6 +555,7 @@ class IRCParser implements LineListener<ThimBot> {
         }
     }
 
+    @SuppressWarnings("unused")
     private String tokenize(final ByteArrayInputStream is, final char delim1, final char delim2) {
         final StringBuilder b = this.b;
         b.setLength(0);
@@ -430,7 +572,7 @@ class IRCParser implements LineListener<ThimBot> {
         }
     }
 
-    private Source parsePrefix(final ByteArrayInputStream is) {
+    private String parsePrefix(final ByteArrayInputStream is) {
         final StringBuilder b = this.b;
         b.setLength(0);
         int ch;
@@ -438,26 +580,22 @@ class IRCParser implements LineListener<ThimBot> {
         ch = is.read();
         if (ch != ':') {
             is.reset();
-            return serverSource;
+            return "";
         }
         ch = is.read();
         while (ch != ' ' && ch != -1) {
             if (ch == '!') {
-                final String nick = b.toString();
-                b.setLength(0);
                 ch = is.read();
                 while (ch != ' ' && ch != -1) {
                     if (ch == '@') {
-                        final String login = b.toString();
-                        b.setLength(0);
                         ch = is.read();
                         while (ch != ' ' && ch != -1) {
                             b.append((char) ch);
                             ch = is.read();
                         }
-                        final String host = b.toString();
+                        final String user = b.toString();
                         b.setLength(0);
-                        return new User(new Nick(nick), login, host);
+                        return user;
                     } else {
                         b.append((char) ch);
                         ch = is.read();
@@ -470,10 +608,10 @@ class IRCParser implements LineListener<ThimBot> {
             }
         }
         b.setLength(0);
-        return serverSource;
+        return "";
     }
 
-    public void terminated(final ThimBot bot, final LineProtocolConnection<ThimBot> connection) {
+    public void terminated(final ThimBot bot, final LineProtocolConnection connection) {
         bot.terminated(connection);
     }
 

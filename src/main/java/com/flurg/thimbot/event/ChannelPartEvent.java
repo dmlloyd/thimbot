@@ -19,55 +19,57 @@
 package com.flurg.thimbot.event;
 
 import com.flurg.thimbot.ThimBot;
-import com.flurg.thimbot.source.Channel;
-import com.flurg.thimbot.source.User;
+import com.flurg.thimbot.util.IRCStringUtil;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class ChannelPartEvent extends Event implements Event.From<User>, Event.To<Channel> {
+public final class ChannelPartEvent extends Event implements FromUserEvent, ChannelEvent, InboundEvent, TextEvent {
 
-    private final User source;
-    private final Channel target;
+    private final String nick;
+    private final String user;
+    private final String channel;
     private final String rawReason;
     private final String reason;
+    private final boolean fromMe;
 
-    public ChannelPartEvent(final ThimBot bot, final User source, final Channel target, final String rawReason) {
+    public ChannelPartEvent(final ThimBot bot, final String user, final String channel, final String rawReason) {
         super(bot);
-        this.source = source;
-        this.target = target;
+        this.user = user;
+        nick = IRCStringUtil.nickOf(user);
+        this.channel = channel;
         this.rawReason = rawReason;
-        reason = MessageUtil.deformat(rawReason);
+        reason = IRCStringUtil.deformat(rawReason);
+        fromMe = getBot().getBotNick().equals(nick);
     }
 
-    public User getSource() {
-        return source;
+    public String getFromNick() {
+        return nick;
     }
 
-    public Channel getTarget() {
-        return target;
+    public String getFromUser() {
+        return user;
     }
 
     public boolean isFromMe() {
-        return getBot().getBotNick().equals(source.getNick());
+        return fromMe;
     }
 
-    public boolean isToMe() {
-        return false;
+    public String getChannel() {
+        return channel;
     }
 
-    public String getRawReason() {
+    public String getRawText() {
         return rawReason;
     }
 
-    public String getReason() {
+    public String getText() {
         return reason;
     }
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
     }
-
 
     public String toString() {
         return super.toString() + " \"" + reason + "\"";

@@ -23,7 +23,7 @@ import com.flurg.thimbot.ThimBot;
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class ErrorEvent extends Event {
+public final class ErrorEvent extends Event implements InboundEvent {
     private final String description;
 
     public ErrorEvent(final ThimBot bot, final String description) {

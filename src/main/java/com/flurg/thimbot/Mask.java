@@ -21,8 +21,6 @@ package com.flurg.thimbot;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.flurg.thimbot.source.User;
-
 public final class Mask {
     private static final Pattern ALL = Pattern.compile(".*");
 
@@ -74,9 +72,5 @@ public final class Mask {
             }
         }
         return Pattern.compile(b.toString());
-    }
-
-    public boolean matches(final User user) {
-        return matches(user.getName(), user.getLogin(), user.getHost());
     }
 }

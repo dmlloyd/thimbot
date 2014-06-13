@@ -18,32 +18,57 @@
 
 package com.flurg.thimbot;
 
-import com.flurg.thimbot.event.ActionEvent;
+import static java.lang.Math.min;
+
+import com.flurg.thimbot.event.AuthenticationRequestEvent;
+import com.flurg.thimbot.event.AuthenticationResponseEvent;
+import com.flurg.thimbot.event.ChannelJoinRequestEvent;
+import com.flurg.thimbot.event.ChannelPartRequestEvent;
 import com.flurg.thimbot.event.DisconnectEvent;
 import com.flurg.thimbot.event.Event;
 import com.flurg.thimbot.event.EventHandler;
 import com.flurg.thimbot.event.EventHandlerContext;
-import com.flurg.thimbot.event.MessageEvent;
+import com.flurg.thimbot.event.IRCBase64;
+import com.flurg.thimbot.event.OutboundActionEvent;
+import com.flurg.thimbot.event.OutboundCTCPCommandEvent;
+import com.flurg.thimbot.event.OutboundCTCPResponseEvent;
+import com.flurg.thimbot.event.OutboundMessageEvent;
+import com.flurg.thimbot.event.OutboundNoticeEvent;
+import com.flurg.thimbot.event.QuitRequestEvent;
+import com.flurg.thimbot.raw.AckEmittableByteArrayOutputStream;
 import com.flurg.thimbot.raw.ByteOutput;
+import com.flurg.thimbot.raw.EmissionKey;
+import com.flurg.thimbot.raw.EmittableByteArrayOutputStream;
 import com.flurg.thimbot.raw.LineOutputCallback;
 import com.flurg.thimbot.raw.LineProtocolConnection;
 import com.flurg.thimbot.raw.StringEmitter;
-import com.flurg.thimbot.source.Channel;
-import com.flurg.thimbot.source.FullTarget;
-import com.flurg.thimbot.source.Nick;
-import com.flurg.thimbot.source.Server;
-import com.flurg.thimbot.source.Target;
-import com.flurg.thimbot.source.User;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
-import java.util.HashMap;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.prefs.PreferenceChangeEvent;
+import java.util.prefs.PreferenceChangeListener;
 import java.util.prefs.Preferences;
 
+import com.flurg.thimbot.util.IRCStringBuilder;
 import javax.net.SocketFactory;
 
 /**
@@ -51,23 +76,141 @@ import javax.net.SocketFactory;
  */
 public final class ThimBot {
 
+    static final Logger IRC_LOGGER = Logger.getLogger("com.flurg.thimbot.irc");
     final Object lock = new Object();
 
-    private volatile Nick botNick = new Nick("thimbot");
-    private volatile Charset charset = Charsets.UTF_8;
+    private volatile Charset charset = StandardCharsets.UTF_8;
     private volatile SocketAddress address;
     private volatile SocketFactory socketFactory = SocketFactory.getDefault();
 
     private final CopyOnWriteArrayList<EventHandler> handlers = new CopyOnWriteArrayList<>();
-    private final Map<Channel, JoinCallback> pendingJoins = new HashMap<>();
 
-    private LineProtocolConnection<ThimBot> connection;
-    private int eventSeq;
+    private LineProtocolConnection connection;
+    private long eventSeq;
     private final Preferences prefs;
     private String login = "thimbot";
-    private String initialNick = "thimbot";
     private String realName = "ThimBot";
     private String version = "A ThimBot!";
+    private String desiredNick = "thimbot";
+    private String currentNick = desiredNick;
+    private StringEmitter nickEmitter = new StringEmitter(currentNick);
+
+    private final Map<EmissionKey, Long> acks = Collections.synchronizedMap(new LinkedHashMap<EmissionKey, Long>() {
+        protected boolean removeEldestEntry(final Map.Entry<EmissionKey, Long> eldest) {
+            return size() > 64;
+        }
+    });
+
+    private final Set<String> joinedChannels = Collections.synchronizedSet(new TreeSet<String>());
+
+    static void install(final ThimBot bot) {
+        final Preferences preferences = bot.getPreferences().node("log");
+        final Handler handler = new Handler() {
+            public void publish(final LogRecord record) {
+                if (!Logging.suppressed() && isLoggable(record)) {
+                    Logging.off();
+                    try {
+                        String channels = preferences.get("targets", "");
+                        if (!channels.isEmpty()) {
+                            String[] split = channels.split("\\s*,\\s*");
+                            if (split.length > 0) {
+                                try {
+                                    String message = record.getMessage();
+                                    if (message != null && !message.isEmpty()) {
+                                        IRCStringBuilder b = new IRCStringBuilder(message.length());
+                                        b.append("(*) ").b().append(record.getLevel()).b().nc().append(' ').append(message);
+                                        bot.sendMessage(Priority.LOW, Arrays.asList(split), message);
+                                    }
+                                } catch (IOException ignored) {
+                                }
+                            }
+                        }
+                    } finally {
+                        Logging.on();
+                    }
+                }
+            }
+
+            public void flush() {
+            }
+
+            public void close() {
+            }
+        };
+        PreferenceChangeListener listener = new PreferenceChangeListener() {
+            public void preferenceChange(final PreferenceChangeEvent evt) {
+                if (evt.getKey().equals("level")) {
+                    String level = evt.getNewValue();
+                    Level realLevel = Level.INFO;
+                    if (level != null) try {
+                        realLevel = Level.parse(level);
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                    try {
+                        handler.setLevel(realLevel);
+                    } catch (SecurityException ignored) {}
+                }
+            }
+        };
+        listener.preferenceChange(new PreferenceChangeEvent(preferences, "level", preferences.get("level", "INFO")));
+        preferences.addPreferenceChangeListener(listener);
+        Logger logger = IRC_LOGGER;
+        logger.setLevel(Level.ALL);
+        logger.addHandler(handler);
+    }
+
+    public void errorf(String fmt, Object... args) {
+        IRC_LOGGER.log(Level.SEVERE, String.format(fmt, args));
+    }
+
+    public void warnf(String fmt, Object... args) {
+        IRC_LOGGER.log(Level.WARNING, String.format(fmt, args));
+    }
+
+    public void infof(String fmt, Object... args) {
+        IRC_LOGGER.log(Level.INFO, String.format(fmt, args));
+    }
+
+    public void debugf(String fmt, Object... args) {
+        if (IRC_LOGGER.isLoggable(Level.FINE)) {
+            IRC_LOGGER.log(Level.FINE, String.format(fmt, args));
+        }
+    }
+
+    public void tracef(String fmt, Object... args) {
+        if (IRC_LOGGER.isLoggable(Level.FINEST)) {
+            IRC_LOGGER.log(Level.FINEST, String.format(fmt, args));
+        }
+    }
+
+    public void registerOutboundMessage(final EmissionKey key, final long seq) {
+        acks.put(key, Long.valueOf(seq));
+    }
+
+    public void acknowledge(final EmissionKey key) {
+        Long seq = acks.remove(key);
+        if (seq != null) {
+            acknowledge(seq.longValue());
+        }
+    }
+
+    void addJoinedChannel(final String channel) {
+        joinedChannels.add(channel);
+    }
+
+    void removeJoinedChannel(final String channel) {
+        joinedChannels.remove(channel);
+    }
+
+    static class SentBytes {
+        final StringEmitter emitted;
+        final long seq;
+
+        SentBytes(final StringEmitter emitted, final long seq) {
+            this.emitted = emitted;
+            this.seq = seq;
+        }
+    }
 
     public ThimBot(Preferences preferences, SocketAddress address, SocketFactory socketFactory) {
         prefs = preferences;
@@ -85,21 +228,22 @@ public final class ThimBot {
             if (connection != null) {
                 throw new IllegalStateException("Already connected");
             }
-            setBotNick(new Nick(initialNick));
+            setBotNick(desiredNick);
             final InetSocketAddress inetSocketAddress = (InetSocketAddress) address;
             final String hostName = inetSocketAddress.getHostName();
             final Socket socket = socketFactory.createSocket(hostName, inetSocketAddress.getPort());
             socket.setTcpNoDelay(true);
-            final LineProtocolConnection<ThimBot> connection = new LineProtocolConnection<>(this, new IRCParser(new Server(hostName)), socket, 16384);
-            connection.queueMessage(Priority.HIGH, new LineOutputCallback<ThimBot>() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final int seq) throws IOException {
+            socket.setSoTimeout(90000);
+            final LineProtocolConnection connection = new LineProtocolConnection(this, new IRCParser(), socket, 16384);
+            connection.queueMessage(Priority.HIGH, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
                     target.write(IRCStrings.NICK);
                     target.write(' ');
-                    target.write(initialNick.getBytes(Charsets.LATIN_1));
+                    target.write(desiredNick.getBytes(StandardCharsets.ISO_8859_1));
                 }
             });
-            connection.queueMessage(Priority.HIGH, new LineOutputCallback<ThimBot>() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final int seq) throws IOException {
+            connection.queueMessage(Priority.HIGH, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
                     target.write(IRCStrings.USER);
                     target.write(' ');
                     target.write(realName);
@@ -109,7 +253,7 @@ public final class ThimBot {
                     target.write('*');
                     target.write(' ');
                     target.write(':');
-                    target.write(realName.getBytes(Charsets.LATIN_1));
+                    target.write(realName.getBytes(StandardCharsets.ISO_8859_1));
                 }
             });
             connection.start();
@@ -129,48 +273,38 @@ public final class ThimBot {
         context.next(event);
     }
 
-    JoinCallback takePendingJoin(String channel) {
+    public void queueMessage(final Priority priority, final LineOutputCallback callback) {
         synchronized (lock) {
-            return pendingJoins.remove(channel);
-        }
-    }
-
-    public void queueMessage(final Priority priority, final LineOutputCallback<ThimBot> callback) {
-        synchronized (lock) {
-            final LineProtocolConnection<ThimBot> connection = this.connection;
+            final LineProtocolConnection connection = this.connection;
             if (connection != null) connection.queueMessage(priority, callback);
         }
     }
 
-    public void acknowledge(final int ackSeq) {
+    public void acknowledge(final long ackSeq) {
         synchronized (lock) {
-            final LineProtocolConnection<ThimBot> connection = this.connection;
+            final LineProtocolConnection connection = this.connection;
             if (connection != null) connection.acknowledge(ackSeq);
         }
     }
 
     public void setWindowSize(final int size) {
         synchronized (lock) {
-            final LineProtocolConnection<ThimBot> connection = this.connection;
+            final LineProtocolConnection connection = this.connection;
             if (connection != null) connection.setWindowSize(size);
         }
     }
 
-    public Nick getBotNick() {
-        return botNick;
+    public String getBotNick() {
+        return currentNick;
     }
 
-    public User getBotUser() {
-        return new User(getBotNick(), "", "");
-    }
-
-    public int getEventSequence() {
+    public long getEventSequence() {
         synchronized (lock) {
             return eventSeq++;
         }
     }
 
-    void terminated(final LineProtocolConnection<ThimBot> connection) {
+    void terminated(final LineProtocolConnection connection) {
         synchronized (lock) {
             connection.detach();
             this.connection = null;
@@ -178,202 +312,271 @@ public final class ThimBot {
         }
     }
 
-    public void sendMessage(final Priority priority, final Target target, final String message) throws IOException {
-        if (message.isEmpty()) {
+    enum CmdType {
+        SIMPLE,
+        CTCP_PRIVMSG,
+        CTCP_NOTICE,
+    }
+
+    void sendRawMultiTarget(final Priority priority, final CmdType cmdType, final Collection<String> targets, final StringEmitter command, final StringEmitter message) throws IOException {
+        if (message.length() == 0) {
             new Throwable("Empty message being emitted").printStackTrace();
             return;
         }
-        final Preferences preferences = target.getPreferences(prefs);
-        final String encoding = preferences.get("encoding", "UTF-8");
-        final StringEmitter contents = new StringEmitter(message, encoding);
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback<ThimBot>() {
-                public void writeLine(final ThimBot context, final ByteOutput output, final int seq) throws IOException {
-                    target.performSendMessage(output, contents);
-                }
-            });
+        if (targets.size() == 0) {
+            new Throwable("No targets").printStackTrace();
+            return;
         }
-        dispatch(new MessageEvent(this, getBotUser(), target, message));
-    }
+        // we will limit the cmd + target list to <= 256 characters, and the message to <= 256 characters (or whatever the server will accept).
+        final Iterator<String> iterator = targets.iterator();
+        assert iterator.hasNext();
 
-    public void sendMessage(final Target target, final String message) throws IOException {
-        sendMessage(Priority.NORMAL, target, message);
-    }
-
-    public void sendAction(final Priority priority, final Target target, final String message) throws IOException {
-        final Preferences preferences = target.getPreferences(prefs);
-        final String encoding = preferences.get("encoding", "UTF-8");
-        final StringEmitter contents = new StringEmitter(message, encoding);
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback<ThimBot>() {
-                public void writeLine(final ThimBot context, final ByteOutput output, final int seq) throws IOException {
-                    target.performSendAction(output, contents);
-                }
-            });
+        StringEmitter current;
+        EmittableByteArrayOutputStream baos = new AckEmittableByteArrayOutputStream(256, new EmissionKey(command, message));
+        if (cmdType == CmdType.CTCP_PRIVMSG) {
+            IRCStrings.PRIVMSG.emit((ByteArrayOutputStream) baos);
+        } else if (cmdType == CmdType.CTCP_NOTICE) {
+            IRCStrings.NOTICE.emit((ByteArrayOutputStream) baos);
+        } else if (cmdType == CmdType.SIMPLE) {
+            command.emit((ByteArrayOutputStream) baos);
+        } else {
+            throw new IllegalStateException();
         }
-        dispatch(new ActionEvent(this, getBotUser(), target, message));
+        baos.write(' ');
+        nickEmitter.emit((ByteArrayOutputStream) baos);
+        do {
+            current = new StringEmitter(iterator.next());
+            if (baos.size() + current.length() >= 256) {
+                // flush
+                baos.write(' ');
+                if (cmdType != CmdType.SIMPLE) {
+                    baos.write(1);
+                    command.emit((ByteArrayOutputStream) baos);
+                    baos.write(' ');
+                    baos.write(':');
+                    message.emit((ByteArrayOutputStream) baos);
+                    baos.write(1);
+                } else {
+                    message.emit((ByteArrayOutputStream) baos);
+                }
+                getConnection().queueMessage(priority, baos);
+                baos = new EmittableByteArrayOutputStream(256);
+                if (cmdType == CmdType.CTCP_PRIVMSG) {
+                    IRCStrings.PRIVMSG.emit((ByteArrayOutputStream) baos);
+                } else if (cmdType == CmdType.CTCP_NOTICE) {
+                    IRCStrings.NOTICE.emit((ByteArrayOutputStream) baos);
+                } else if (cmdType == CmdType.SIMPLE) {
+                    command.emit((ByteArrayOutputStream) baos);
+                } else {
+                    throw new IllegalStateException();
+                }
+                baos.write(' ');
+                current.emit((ByteArrayOutputStream) baos);
+            } else {
+                baos.write(',');
+                current.emit((ByteArrayOutputStream) baos);
+            }
+        } while (iterator.hasNext());
+        baos.write(' ');
+        message.emit((ByteArrayOutputStream) baos);
+        synchronized (lock) {
+            getConnection().queueMessage(priority, baos);
+        }
     }
 
-    public void sendAction(final Target target, final String message) throws IOException {
+    // Message
+
+    public void sendMessage(final Priority priority, final Collection<String> targets, final String message) throws IOException {
+        HashSet<String> set = new HashSet<>(targets);
+        sendRawMultiTarget(priority, CmdType.SIMPLE, set, IRCStrings.PRIVMSG, new StringEmitter(message));
+        dispatch(new OutboundMessageEvent(this, set, message));
+    }
+
+    public void sendMessage(final Priority priority, final String target, final String message, final boolean redispatch) throws IOException {
+        Set<String> set = Collections.singleton(target);
+        sendRawMultiTarget(priority, CmdType.SIMPLE, set, IRCStrings.PRIVMSG, new StringEmitter(message));
+        if (redispatch) dispatch(new OutboundMessageEvent(this, set, message));
+    }
+
+    public void sendMessage(final String target, final String message, final boolean redispatch) throws IOException {
+        sendMessage(Priority.NORMAL, target, message, redispatch);
+    }
+
+    public void sendMessage(final Priority priority, final String target, final String message) throws IOException {
+        sendMessage(priority, target, message, true);
+    }
+
+    public void sendMessage(final String target, final String message) throws IOException {
+        sendMessage(Priority.NORMAL, target, message, true);
+    }
+
+    public void sendMessage(final Priority priority, final String[] targets, final String message) throws IOException {
+        sendMessage(priority, Arrays.asList(targets), message);
+    }
+
+    // Action
+
+    public void sendAction(final Priority priority, final Collection<String> targets, final String message) throws IOException {
+        Set<String> set = new HashSet<>(targets);
+        sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, IRCStrings.ACTION, new StringEmitter(message));
+        dispatch(new OutboundActionEvent(this, set, message));
+    }
+
+    public void sendAction(final Priority priority, final String target, final String message) throws IOException {
+        Set<String> set = Collections.singleton(target);
+        sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, IRCStrings.ACTION, new StringEmitter(message));
+        dispatch(new OutboundActionEvent(this, set, message));
+    }
+
+    public void sendAction(final String target, final String message) throws IOException {
         sendAction(Priority.NORMAL, target, message);
     }
 
-    public void sendNotice(final Priority priority, final FullTarget target, final String message) throws IOException {
-        final Preferences preferences = target.getPreferences(prefs);
-        final String encoding = preferences.get("encoding", "UTF-8");
-        final StringEmitter contents = new StringEmitter(message, encoding);
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback<ThimBot>() {
-                public void writeLine(final ThimBot context, final ByteOutput output, final int seq) throws IOException {
-                    target.performSendNotice(output, contents);
-                }
-            });
-        }
+    // Notice
+
+    public void sendNotice(final Priority priority, final String target, final String message) throws IOException {
+        Set<String> set = Collections.singleton(target);
+        sendRawMultiTarget(priority, CmdType.SIMPLE, set, IRCStrings.NOTICE, new StringEmitter(message));
+        dispatch(new OutboundNoticeEvent(this, set, message));
     }
 
-    public void sendNotice(final FullTarget target, final String message) throws IOException {
+    public void sendNotice(final String target, final String message) throws IOException {
         sendNotice(Priority.NORMAL, target, message);
     }
 
-    public void sendCTCPCommand(final Priority priority, final FullTarget target, final StringEmitter command, final StringEmitter argument) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback<ThimBot>() {
-                public void writeLine(final ThimBot context, final ByteOutput output, final int seq) throws IOException {
-                    target.performSendCTCPCommand(output, command, argument);
-                }
-            });
-        }
+    // CTCP command
+
+    public void sendCTCPCommand(final Priority priority, final String target, final StringEmitter command, final StringEmitter argument) throws IOException {
+        Set<String> set = Collections.singleton(target);
+        sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, command, argument);
+        dispatch(new OutboundCTCPCommandEvent(this, set, command.toString(), argument.toString()));
     }
 
-    public void sendCTCPCommand(final Priority priority, final FullTarget target, final String command, final String argument) throws IOException {
-        final Preferences preferences = target.getPreferences(prefs);
-        final String encoding = preferences.get("encoding", "UTF-8");
-        final StringEmitter commandEmitter = new StringEmitter(command, encoding);
-        final StringEmitter argumentEmitter = argument == null ? null : new StringEmitter(argument, encoding);
-        sendCTCPCommand(priority, target, commandEmitter, argumentEmitter);
+    public void sendCTCPCommand(final Priority priority, final String target, final String command, final String argument) throws IOException {
+        Set<String> set = Collections.singleton(target);
+        sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, new StringEmitter(command), new StringEmitter(argument));
+        dispatch(new OutboundCTCPCommandEvent(this, set, command, argument));
     }
 
-    public void sendCTCPCommand(final FullTarget target, final String command, final String argument) throws IOException {
+    public void sendCTCPCommand(final String target, final String command, final String argument) throws IOException {
         sendCTCPCommand(Priority.NORMAL, target, command, argument);
     }
 
-    public void sendCTCPResponse(final Priority priority, final FullTarget target, final StringEmitter response, final StringEmitter argument) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback<ThimBot>() {
-                public void writeLine(final ThimBot context, final ByteOutput output, final int seq) throws IOException {
-                    target.performSendCTCPResponse(output, response, argument);
-                }
-            });
-        }
-    }
-
-    private LineProtocolConnection<ThimBot> getConnection() throws IOException {
-        final LineProtocolConnection<ThimBot> connection = this.connection;
+    private LineProtocolConnection getConnection() throws IOException {
+        final LineProtocolConnection connection = this.connection;
         if (connection == null) {
             throw notConnected();
         }
         return connection;
     }
 
-    public void sendCTCPResponse(final Priority priority, final FullTarget target, final String response, final String argument) throws IOException {
-        final Preferences preferences = target.getPreferences(prefs);
-        final String encoding = preferences.get("encoding", "UTF-8");
-        final StringEmitter responseEmitter = new StringEmitter(response, encoding);
-        final StringEmitter argumentEmitter = argument == null ? null : new StringEmitter(argument, encoding);
-        sendCTCPResponse(priority, target, responseEmitter, argumentEmitter);
+    // CTCP response
+
+    public void sendCTCPResponse(final Priority priority, final String target, final StringEmitter response, final StringEmitter argument) throws IOException {
+        Set<String> set = Collections.singleton(target);
+        sendRawMultiTarget(priority, CmdType.CTCP_NOTICE, set, response, argument);
+        dispatch(new OutboundCTCPResponseEvent(this, set, response.toString(), argument.toString()));
     }
 
-    public void sendCTCPResponse(final FullTarget target, final String response, final String argument) throws IOException {
+    public void sendCTCPResponse(final Priority priority, final String target, final String response, final String argument) throws IOException {
+        Set<String> set = Collections.singleton(target);
+        sendRawMultiTarget(priority, CmdType.CTCP_NOTICE, set, new StringEmitter(response), new StringEmitter(argument));
+        dispatch(new OutboundCTCPResponseEvent(this, set, response, argument));
+    }
+
+    public void sendCTCPResponse(final String target, final String response, final String argument) throws IOException {
         sendCTCPResponse(Priority.NORMAL, target, response, argument);
     }
 
-    public void sendPing(final Priority priority, final FullTarget target, final StringEmitter argument) throws IOException {
+    // ping
+
+    public void sendPing(final Priority priority, final String target, final StringEmitter argument) throws IOException {
         sendCTCPCommand(priority, target, IRCStrings.PING, argument);
     }
 
-    public void sendPing(final Priority priority, final FullTarget target, final String argument) throws IOException {
-        final Preferences preferences = target.getPreferences(prefs);
-        final String encoding = preferences.get("encoding", "UTF-8");
-        sendPing(priority, target, new StringEmitter(argument, encoding));
+    public void sendPing(final Priority priority, final String target, final String argument) throws IOException {
+        sendPing(priority, target, new StringEmitter(argument));
     }
 
-    public void sendPing(final FullTarget target, final String argument) throws IOException {
+    public void sendPing(final String target, final String argument) throws IOException {
         sendPing(Priority.NORMAL, target, argument);
     }
 
-    public void sendPong(final Priority priority, final FullTarget target, final StringEmitter argument) throws IOException {
+    // pong
+
+    public void sendPong(final Priority priority, final String target, final StringEmitter argument) throws IOException {
         sendCTCPResponse(priority, target, IRCStrings.PING, argument);
     }
 
-    public void sendPong(final Priority priority, final FullTarget target, final String argument) throws IOException {
-        final Preferences preferences = target.getPreferences(prefs);
-        final String encoding = preferences.get("encoding", "UTF-8");
-        sendPong(priority, target, new StringEmitter(argument, encoding));
+    public void sendPong(final Priority priority, final String target, final String argument) throws IOException {
+        sendPong(priority, target, new StringEmitter(argument));
     }
 
-    public void sendPong(final FullTarget target, final String argument) throws IOException {
+    public void sendPong(final String target, final String argument) throws IOException {
         sendPong(Priority.NORMAL, target, argument);
     }
 
     public void sendPong(final Priority priority, final String payload) throws IOException {
-        getConnection().queueMessage(priority, new LineOutputCallback<ThimBot>() {
-            public void writeLine(final ThimBot context, final ByteOutput target, final int seq) throws IOException {
-                target.write(IRCStrings.PONG);
-                target.write(' ');
-                target.write(':');
-                target.write(payload.getBytes(Charsets.LATIN_1));
-            }
-        });
+        synchronized (lock) {
+            getConnection().queueMessage(priority, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.PONG);
+                    target.write(' ');
+                    target.write(':');
+                    target.write(payload.getBytes(StandardCharsets.UTF_8));
+                }
+            });
+        }
     }
 
     public void sendPong(final String payload) throws IOException {
         sendPong(Priority.NORMAL, payload);
     }
 
-    public void join(final Priority priority, final Channel channel) throws IOException {
-        getConnection().queueMessage(priority, new JoinCallback(channel));
+    // join
+
+    public void sendJoin(final String name) throws IOException {
+        sendJoin(Priority.NORMAL, name);
     }
 
-    public void join(final Channel channel) throws IOException {
-        join(Priority.NORMAL, channel);
-    }
-
-    public void part(final Priority priority, final Channel channel, final String reason) throws IOException {
-        getConnection().queueMessage(priority, new LineOutputCallback<ThimBot>() {
-            public void writeLine(final ThimBot context, final ByteOutput target, final int seq) throws IOException {
-                target.write(IRCStrings.PART);
-                target.write(' ');
-                channel.writeName(target);
-                if (reason != null) {
+    public void sendJoin(final Priority priority, final String channel) throws IOException {
+        synchronized (lock) {
+            getConnection().queueMessage(priority, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.JOIN);
                     target.write(' ');
-                    target.write(':');
-                    target.write(reason.getBytes(getCharset(channel)));
+                    target.write(new StringEmitter(channel));
                 }
-            }
-        });
+            });
+        }
+        dispatch(new ChannelJoinRequestEvent(this, channel));
     }
 
-    public void part(Channel channel, String reason) throws IOException {
-        part(Priority.NORMAL, channel, reason);
+    // part
+
+    public void sendPart(final String channel, final String reason) throws IOException {
+        sendPart(Priority.NORMAL, channel, reason);
     }
 
-    public void part(Priority priority, Channel channel) throws IOException {
-        part(priority, channel, null);
+    public void sendPart(final Priority priority, final String channel, final String reason) throws IOException {
+        synchronized (lock) {
+            getConnection().queueMessage(priority, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.PART);
+                    target.write(' ');
+                    target.write(new StringEmitter(channel));
+                    if (reason != null) {
+                        target.write(' ');
+                        target.write(':');
+                        target.write(reason.getBytes(getCharset()));
+                    }
+                }
+            });
+        }
+        dispatch(new ChannelPartRequestEvent(this, channel, reason));
     }
 
-    public void part(Channel channel) throws IOException {
-        part(Priority.NORMAL, channel, null);
-    }
-
-    public void requestMode(Priority priority, final FullTarget target) throws IOException {
-        getConnection().queueMessage(priority, new LineOutputCallback<ThimBot>() {
-            public void writeLine(final ThimBot context, final ByteOutput output, final int seq) throws IOException {
-                output.write(IRCStrings.MODE);
-                output.write(' ');
-                target.writeName(output);
-            }
-        });
-    }
+    // quit
 
     public void quit() throws IOException {
         quit(Priority.NORMAL, null);
@@ -388,20 +591,87 @@ public final class ThimBot {
     }
 
     public void quit(Priority priority, final String reason) throws IOException {
-        getConnection().queueMessage(priority, new LineOutputCallback<ThimBot>() {
-            public void writeLine(final ThimBot context, final ByteOutput target, final int seq) throws IOException {
-                target.write(IRCStrings.QUIT);
-                if (reason != null) {
-                    target.write(' ');
-                    target.write(':');
-                    target.write(reason.getBytes(getCharset()));
+        synchronized (lock) {
+            getConnection().queueMessage(priority, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.QUIT);
+                    if (reason != null) {
+                        target.write(' ');
+                        target.write(':');
+                        target.write(reason.getBytes(getCharset()));
+                    }
                 }
-            }
-        });
+            });
+        }
+        dispatch(new QuitRequestEvent(this, reason));
     }
 
-    public void requestMode(final FullTarget target) throws IOException {
-        requestMode(Priority.NORMAL, target);
+    // mode
+
+    public void sendModeRequest(final String target) throws IOException {
+        sendModeRequest(Priority.NORMAL, target);
+    }
+
+    public void sendModeRequest(final Priority priority, final String target) throws IOException {
+        synchronized (lock) {
+            getConnection().queueMessage(priority, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput bo, final long seq) throws IOException {
+                    bo.write(IRCStrings.MODE);
+                    bo.write(' ');
+                    bo.write(target.getBytes(StandardCharsets.UTF_8));
+                }
+            });
+        }
+    }
+
+    // SASL authenticate
+
+    public void saslAuthRequest(final String mechanismName) throws IOException {
+        saslAuthRequest(Priority.HIGH, mechanismName);
+    }
+
+    public void saslAuthRequest(final Priority priority, final String mechanismName) throws IOException {
+        synchronized (lock) {
+            getConnection().queueMessage(priority, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.AUTHENTICATE);
+                    target.write(' ');
+                    target.write(mechanismName);
+                }
+            });
+        }
+        dispatch(new AuthenticationRequestEvent(this, mechanismName));
+    }
+
+    // SASL response
+
+    public void saslResponse(final byte[] response) throws IOException {
+        saslResponse(Priority.HIGH, response);
+    }
+
+    public void saslResponse(final Priority priority, final byte[] response) throws IOException {
+        synchronized (lock) {
+            final int length = response.length;
+            if (length == 0) {
+                getConnection().queueMessage(priority, new LineOutputCallback() {
+                    public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                        target.write(IRCStrings.AUTHENTICATE);
+                        target.write(' ');
+                        target.write('+');
+                    }
+                });
+            } else for (int i = 0; i < length; i += 400) {
+                final int start = i;
+                getConnection().queueMessage(priority, new LineOutputCallback() {
+                    public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                        target.write(IRCStrings.AUTHENTICATE);
+                        target.write(' ');
+                        IRCBase64.encode(response, start, min(400, length - start), target);
+                    }
+                });
+            }
+        }
+        dispatch(new AuthenticationResponseEvent(this, response));
     }
 
     private static IOException notConnected() {
@@ -416,10 +686,6 @@ public final class ThimBot {
         this.charset = charset;
     }
 
-    public Charset getCharset(final Target target) {
-        return Charset.forName(target.getPreferences(prefs).get("encoding", "UTF-8"));
-    }
-
     public void setLogin(final String login) {
         this.login = login;
     }
@@ -428,12 +694,12 @@ public final class ThimBot {
         return login;
     }
 
-    public void setInitialNick(final String initialNick) {
-        this.initialNick = initialNick;
+    public void setDesiredNick(final String desiredNick) {
+        this.desiredNick = desiredNick;
     }
 
-    public String getInitialNick() {
-        return initialNick;
+    public String getDesiredNick() {
+        return desiredNick;
     }
 
     public void setRealName(final String realName) {
@@ -447,7 +713,6 @@ public final class ThimBot {
     public void setVersion(final String version) {
         this.version = version;
     }
-
 
     public String getVersion() {
         return version;
@@ -468,30 +733,10 @@ public final class ThimBot {
         return prefs;
     }
 
-    void setBotNick(final Nick botNick) {
-        this.botNick = botNick;
-        initialNick = botNick.getName();
-    }
-
-    class JoinCallback implements LineOutputCallback<ThimBot> {
-
-        private final Channel channel;
-        private volatile int seq;
-
-        JoinCallback(final Channel channel) {
-            this.channel = channel;
-        }
-
-        public void writeLine(final ThimBot context, final ByteOutput target, final int seq) throws IOException {
-            target.write(IRCStrings.JOIN);
-            target.write(' ');
-            channel.writeName(target);
-            this.seq = seq;
-            pendingJoins.put(channel, this);
-        }
-
-        void ack() {
-            acknowledge(seq);
+    void setBotNick(final String nick) {
+        if (! nick.equals(currentNick)) {
+            currentNick = nick;
+            nickEmitter = new StringEmitter(nick);
         }
     }
 }

@@ -20,9 +20,11 @@ package com.flurg.thimbot.raw;
 
 import java.io.IOException;
 
+import com.flurg.thimbot.ThimBot;
+
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public interface LineOutputCallback<T> {
-    void writeLine(T context, ByteOutput target, int seq) throws IOException;
+public interface LineOutputCallback {
+    void writeLine(ThimBot context, ByteOutput target, long seq) throws IOException;
 }

@@ -18,8 +18,9 @@
 
 package com.flurg.thimbot.raw;
 
-import com.flurg.thimbot.Charsets;
 import com.flurg.thimbot.Priority;
+import com.flurg.thimbot.ThimBot;
+
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -28,28 +29,30 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class LineProtocolConnection<T> {
+public final class LineProtocolConnection {
 
     static final Charset UTF_8 = Charset.forName("utf-8");
+    private static final long PING_TIME = 24000000000L;
 
-    final T context;
-    final LineListener<T> lineListener;
+    final ThimBot context;
+    final LineListener lineListener;
     final Socket socket;
     final int bufSize;
 
     boolean shutdown;
     int windowSize = 8;
-    int seq, ack;
+    long seq, ack;
 
     final Object lock = new Object();
-    final ArrayDeque<LineOutputCallback<T>> lowQueue = new ArrayDeque<>();
-    final ArrayDeque<LineOutputCallback<T>> medQueue = new ArrayDeque<>();
-    final ArrayDeque<LineOutputCallback<T>> highQueue = new ArrayDeque<>();
+    final ArrayDeque<LineOutputCallback> lowQueue = new ArrayDeque<>();
+    final ArrayDeque<LineOutputCallback> medQueue = new ArrayDeque<>();
+    final ArrayDeque<LineOutputCallback> highQueue = new ArrayDeque<>();
 
     private final Thread readThread = new Thread(new Runnable() {
 
@@ -57,7 +60,7 @@ public final class LineProtocolConnection<T> {
             try {
                 final InputStream inputStream = socket.getInputStream();
                 final byte[] bytes = new byte[bufSize];
-                final LineListener<T> listener = lineListener;
+                final LineListener listener = lineListener;
                 int res;
                 int lim = 0, pos = 0;
                 for (;;) {
@@ -69,7 +72,7 @@ public final class LineProtocolConnection<T> {
 
                     for (int i = pos; i < lim; i ++) {
                         if (bytes[i] == 13 && i < lim - 1 && bytes[i + 1] == 10) {
-                            System.out.printf(">>> %s%n", new String(bytes, pos, i - pos, Charsets.US_ASCII));
+                            System.out.printf(">>> %s%n", new String(bytes, pos, i - pos, StandardCharsets.US_ASCII));
                             listener.handleLine(context, LineProtocolConnection.this, bytes, pos, i - pos);
                             pos = i + 2;
                         }
@@ -83,7 +86,7 @@ public final class LineProtocolConnection<T> {
 
                     if (res == -1) {
                         if (lim > 0) {
-                            System.out.printf(">>> %s%n", new String(bytes, 0, lim, Charsets.US_ASCII));
+                            System.out.printf(">>> %s%n", new String(bytes, 0, lim, StandardCharsets.US_ASCII));
                             listener.handleLine(context, LineProtocolConnection.this, bytes, 0, lim);
                         }
                         signalShutdown();
@@ -91,6 +94,7 @@ public final class LineProtocolConnection<T> {
                     }
                 }
             } catch (IOException e) {
+                System.out.printf("Read exception: %s%n", e);
                 signalShutdown();
             }
         }
@@ -101,25 +105,28 @@ public final class LineProtocolConnection<T> {
             try {
                 final OutputStream outputStream = new BufferedOutputStream(socket.getOutputStream(), 16384);
                 final Object lock = LineProtocolConnection.this.lock;
-                LineOutputCallback<T> callback;
+                LineOutputCallback callback;
                 boolean shutdown = false;
+                long lastPing = System.nanoTime();
+                long now;
 
                 for (;;) {
                     synchronized (lock) {
                         if (LineProtocolConnection.this.shutdown) return;
-                        if (seq - ack == windowSize) {
+                        if ((now = System.nanoTime()) - lastPing > PING_TIME || seq - ack == (long)windowSize) {
                             outputStream.write('P');
                             outputStream.write('I');
                             outputStream.write('N');
                             outputStream.write('G');
                             outputStream.write(' ');
                             outputStream.write('Q');
-                            outputStream.write(Integer.toString(seq++).getBytes(Charsets.US_ASCII));
+                            outputStream.write(Long.toString(seq++).getBytes(StandardCharsets.US_ASCII));
                             outputStream.write(13);
                             outputStream.write(10);
                             outputStream.flush();
+                            lastPing = now;
                         }
-                        while (seq - ack > windowSize) try {
+                        while (seq - ack > (long)windowSize) try {
                             lock.wait();
                             if (LineProtocolConnection.this.shutdown) return;
                         } catch (InterruptedException e) {
@@ -136,7 +143,7 @@ public final class LineProtocolConnection<T> {
                                             return;
                                         }
                                         try {
-                                            lock.wait();
+                                            lock.wait(PING_TIME / 1000000L + 50L, (int) (PING_TIME % 1000000L));
                                             if (LineProtocolConnection.this.shutdown) return;
                                         } catch (InterruptedException e) {
                                         }
@@ -146,7 +153,7 @@ public final class LineProtocolConnection<T> {
                             }
                         } while (callback == null);
                     }
-                    try {
+                    if (callback != null) try {
                         final ByteArrayOutput byteOutput = new ByteArrayOutput();
                         callback.writeLine(context, byteOutput, seq);
                         if (byteOutput.isWritten()) {
@@ -158,14 +165,16 @@ public final class LineProtocolConnection<T> {
                             seq++;
                         }
                     } catch (IOException e) {
+                        System.out.printf("Write exception: %s%n", e);
                         return;
                     }
                 }
             } catch (IOException e) {
+                System.out.printf("Write exception: %s%n", e);
                 return;
             } finally {
                 safeClose(socket);
-                final LineListener<T> listener = lineListener;
+                final LineListener listener = lineListener;
                 try {
                     listener.terminated(context, LineProtocolConnection.this);
                 } catch (Throwable ignored) {}
@@ -173,7 +182,7 @@ public final class LineProtocolConnection<T> {
         }
     }, "IRC Write Thread");
 
-    public LineProtocolConnection(final T context, final LineListener<T> lineListener, final Socket socket, final int bufSize) {
+    public LineProtocolConnection(final ThimBot context, final LineListener lineListener, final Socket socket, final int bufSize) {
         this.context = context;
         this.lineListener = lineListener;
         this.socket = socket;
@@ -185,7 +194,7 @@ public final class LineProtocolConnection<T> {
         writeThread.start();
     }
 
-    private void enqueue(ArrayDeque<LineOutputCallback<T>> queue, LineOutputCallback<T> callback) {
+    private void enqueue(ArrayDeque<LineOutputCallback> queue, LineOutputCallback callback) {
         synchronized (lock) {
             if (shutdown) {
                 return;
@@ -197,7 +206,7 @@ public final class LineProtocolConnection<T> {
         }
     }
 
-    public void queueMessage(Priority priority, LineOutputCallback<T> callback) {
+    public void queueMessage(Priority priority, LineOutputCallback callback) {
         if (priority == Priority.HIGH) {
             enqueue(highQueue, callback);
         } else if (priority == Priority.NORMAL) {
@@ -216,7 +225,7 @@ public final class LineProtocolConnection<T> {
         }
     }
 
-    public void acknowledge(int ackSeq) {
+    public void acknowledge(long ackSeq) {
         synchronized (lock) {
             if (ack < ackSeq) {
                 ack = ackSeq;
@@ -262,8 +271,12 @@ public final class LineProtocolConnection<T> {
         ByteArrayOutput() {
         }
 
+        public void write(final Emittable emitter) throws IOException {
+            emitter.emit((ByteArrayOutputStream) this);
+        }
+
         public void write(final StringEmitter emitter) throws IOException {
-            emitter.emit(this);
+            emitter.emit((ByteArrayOutputStream) this);
         }
 
         public void write(final String string, final Charset charset) throws IOException {
@@ -271,7 +284,7 @@ public final class LineProtocolConnection<T> {
         }
 
         public void write(final String string) throws IOException {
-            write(string.getBytes(Charsets.US_ASCII));
+            write(string.getBytes(StandardCharsets.US_ASCII));
         }
 
         public void write(final int b) {

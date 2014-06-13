@@ -26,15 +26,16 @@ import com.flurg.thimbot.raw.StringEmitter;
 public final class IRCStrings {
 
     public static final StringEmitter ACTION = new StringEmitter("ACTION");
+    public static final StringEmitter AUTHENTICATE = new StringEmitter("AUTHENTICATE");
     public static final StringEmitter JOIN = new StringEmitter("JOIN");
     public static final StringEmitter MODE = new StringEmitter("MODE");
+    public static final StringEmitter NICK = new StringEmitter("NICK");
     public static final StringEmitter NOTICE = new StringEmitter("NOTICE");
     public static final StringEmitter PART = new StringEmitter("PART");
     public static final StringEmitter PING = new StringEmitter("PING");
     public static final StringEmitter PONG = new StringEmitter("PONG");
     public static final StringEmitter PRIVMSG = new StringEmitter("PRIVMSG");
     public static final StringEmitter QUIT = new StringEmitter("QUIT");
-    public static final StringEmitter NICK = new StringEmitter("NICK");
     public static final StringEmitter USER = new StringEmitter("USER");
 
     private IRCStrings() {

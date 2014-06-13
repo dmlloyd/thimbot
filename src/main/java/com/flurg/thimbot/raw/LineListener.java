@@ -18,11 +18,13 @@
 
 package com.flurg.thimbot.raw;
 
+import com.flurg.thimbot.ThimBot;
+
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public interface LineListener<T> {
-    void handleLine(T context, LineProtocolConnection<T> connection, byte[] buffer, int offs, int len);
+public interface LineListener {
+    void handleLine(ThimBot context, LineProtocolConnection connection, byte[] buffer, int offs, int len);
 
-    void terminated(T context, LineProtocolConnection<T> connection);
+    void terminated(ThimBot context, LineProtocolConnection connection);
 }

@@ -19,48 +19,40 @@
 package com.flurg.thimbot.event;
 
 import com.flurg.thimbot.ThimBot;
-import com.flurg.thimbot.source.Channel;
+import com.flurg.thimbot.util.IRCStringUtil;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class ChannelRedirectEvent extends Event implements Event.To<Channel>, Event.Regarding<Channel> {
+public final class ChannelRedirectEvent extends Event implements ChannelEvent, InboundEvent, TextEvent {
 
-    private final Channel regarding;
-    private final Channel to;
+    private final String from;
+    private final String to;
     private final String rawReason;
     private final String reason;
 
-    public ChannelRedirectEvent(final ThimBot bot, final Channel regarding, final Channel to, final String rawReason) {
+    public ChannelRedirectEvent(final ThimBot bot, final String from, final String to, final String rawReason) {
         super(bot);
-        this.regarding = regarding;
+        this.from = from;
         this.to = to;
         this.rawReason = rawReason;
-        reason = MessageUtil.deformat(rawReason);
+        reason = IRCStringUtil.deformat(rawReason);
     }
 
-    public String getRawReason() {
+    public String getRawText() {
         return rawReason;
     }
 
-    public String getReason() {
+    public String getText() {
         return reason;
     }
 
-    public Channel getRegarding() {
-        return regarding;
+    public String getChannel() {
+        return from;
     }
 
-    public boolean isRegardingMe() {
-        return false;
-    }
-
-    public Channel getTarget() {
+    public String getTarget() {
         return to;
-    }
-
-    public boolean isToMe() {
-        return false;
     }
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {

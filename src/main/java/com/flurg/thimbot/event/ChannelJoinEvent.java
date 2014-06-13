@@ -19,37 +19,40 @@
 package com.flurg.thimbot.event;
 
 import com.flurg.thimbot.ThimBot;
-import com.flurg.thimbot.source.Channel;
-import com.flurg.thimbot.source.User;
+import com.flurg.thimbot.util.IRCStringUtil;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class ChannelJoinEvent extends Event implements Event.From<User>, Event.To<Channel> {
+public final class ChannelJoinEvent extends Event implements FromUserEvent, ChannelEvent, InboundEvent {
 
-    private final User source;
-    private final Channel target;
+    private final String nick;
+    private final String user;
+    private final String channel;
+    private final boolean fromMe;
 
-    public ChannelJoinEvent(final ThimBot bot, final User source, final Channel target) {
+    public ChannelJoinEvent(final ThimBot bot, final String user, final String channel) {
         super(bot);
-        this.source = source;
-        this.target = target;
+        this.user = user;
+        nick = IRCStringUtil.nickOf(user);
+        this.channel = channel;
+        fromMe = getBot().getBotNick().equals(nick);
     }
 
-    public User getSource() {
-        return source;
+    public String getFromNick() {
+        return nick;
     }
 
-    public Channel getTarget() {
-        return target;
+    public String getFromUser() {
+        return user;
+    }
+
+    public String getChannel() {
+        return channel;
     }
 
     public boolean isFromMe() {
-        return getBot().getBotNick().equals(source.getNick());
-    }
-
-    public boolean isToMe() {
-        return false;
+        return fromMe;
     }
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {

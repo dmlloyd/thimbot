@@ -23,7 +23,7 @@ import com.flurg.thimbot.ThimBot;
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class MOTDEndEvent extends Event {
+public final class MOTDEndEvent extends Event implements InboundEvent {
 
     public MOTDEndEvent(final ThimBot bot) {
         super(bot);

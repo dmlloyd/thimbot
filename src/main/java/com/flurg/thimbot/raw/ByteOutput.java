@@ -27,6 +27,8 @@ import java.nio.charset.Charset;
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public interface ByteOutput {
+    void write(Emittable emitter) throws IOException;
+
     void write(StringEmitter emitter) throws IOException;
 
     void write(String string, Charset charset) throws IOException;

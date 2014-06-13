@@ -18,35 +18,18 @@
 
 package com.flurg.thimbot.event;
 
-import com.flurg.thimbot.IRCStringUtil;
 import com.flurg.thimbot.ThimBot;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class MOTDLineEvent extends Event {
-    private final String rawLine;
-    private final String line;
+public final class MOTDLineEvent extends AbstractTextEvent implements InboundEvent, TextEvent {
 
     public MOTDLineEvent(final ThimBot bot, final String rawLine) {
-        super(bot);
-        this.rawLine = rawLine;
-        line = IRCStringUtil.deformat(rawLine);
+        super(bot, rawLine);
     }
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
-    }
-
-    public String getRawLine() {
-        return rawLine;
-    }
-
-    public String getLine() {
-        return line;
-    }
-
-    public String toString() {
-        return super.toString() + " \"" + line + "\"";
     }
 }
