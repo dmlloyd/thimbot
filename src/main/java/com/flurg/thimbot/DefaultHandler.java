@@ -21,6 +21,7 @@ package com.flurg.thimbot;
 import com.flurg.thimbot.event.ChannelJoinEvent;
 import com.flurg.thimbot.event.ChannelKickEvent;
 import com.flurg.thimbot.event.ChannelPartEvent;
+import com.flurg.thimbot.event.DisconnectEvent;
 import com.flurg.thimbot.event.EventHandler;
 import com.flurg.thimbot.event.EventHandlerContext;
 import com.flurg.thimbot.event.NickChangeEvent;
@@ -36,6 +37,13 @@ import com.flurg.thimbot.raw.StringEmitter;
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 final class DefaultHandler extends EventHandler {
+
+    // connection
+
+    public void handleEvent(final EventHandlerContext context, final DisconnectEvent event) throws Exception {
+        event.getBot().disconnect();
+        super.handleEvent(context, event);
+    }
 
     // flow control - messages and actions
 

@@ -24,7 +24,10 @@ import com.flurg.thimbot.event.AuthenticationRequestEvent;
 import com.flurg.thimbot.event.AuthenticationResponseEvent;
 import com.flurg.thimbot.event.ChannelJoinRequestEvent;
 import com.flurg.thimbot.event.ChannelPartRequestEvent;
+import com.flurg.thimbot.event.ConnectEvent;
+import com.flurg.thimbot.event.ConnectRequestEvent;
 import com.flurg.thimbot.event.DisconnectEvent;
+import com.flurg.thimbot.event.DisconnectRequestEvent;
 import com.flurg.thimbot.event.Event;
 import com.flurg.thimbot.event.EventHandler;
 import com.flurg.thimbot.event.EventHandlerContext;
@@ -202,6 +205,10 @@ public final class ThimBot {
         joinedChannels.remove(channel);
     }
 
+    public String getServerName() {
+        return connection.getServerName();
+    }
+
     static class SentBytes {
         final StringEmitter emitted;
         final long seq;
@@ -224,6 +231,7 @@ public final class ThimBot {
     }
 
     public void connect() throws IOException {
+        dispatch(new ConnectRequestEvent(this));
         synchronized (lock) {
             if (connection != null) {
                 throw new IllegalStateException("Already connected");
@@ -233,7 +241,6 @@ public final class ThimBot {
             final String hostName = inetSocketAddress.getHostName();
             final Socket socket = socketFactory.createSocket(hostName, inetSocketAddress.getPort());
             socket.setTcpNoDelay(true);
-            socket.setSoTimeout(90000);
             final LineProtocolConnection connection = new LineProtocolConnection(this, new IRCParser(), socket, 16384);
             connection.queueMessage(Priority.HIGH, new LineOutputCallback() {
                 public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
@@ -259,6 +266,7 @@ public final class ThimBot {
             connection.start();
             this.connection = connection;
         }
+        dispatch(new ConnectEvent(this));
     }
 
     public EventHandlerContext createEventHandlerContext() {
@@ -308,8 +316,15 @@ public final class ThimBot {
         synchronized (lock) {
             connection.detach();
             this.connection = null;
-            dispatch(new DisconnectEvent(this));
         }
+        dispatch(new DisconnectEvent(this));
+    }
+
+    public void disconnect() throws IOException {
+        synchronized (lock) {
+            connection.terminate();
+        }
+        dispatch(new DisconnectRequestEvent(this));
     }
 
     enum CmdType {

@@ -45,4 +45,8 @@ public final class Arrays2 {
     public static boolean equals(byte[] a1, int offs, byte[] a2) {
         return equals(a1, offs, a2.length, a2, 0, a2.length);
     }
+
+    public static String[] of(final String... s) {
+        return s;
+    }
 }

@@ -127,6 +127,10 @@ public abstract class EventHandler {
         handleEvent(context, (Event) event);
     }
 
+    public void handleEvent(final EventHandlerContext context, final ConnectRequestEvent event) throws Exception {
+        handleEvent(context, (Event) event);
+    }
+
     public void handleEvent(final EventHandlerContext context, final DisconnectEvent event) throws Exception {
         handleEvent(context, (Event) event);
     }

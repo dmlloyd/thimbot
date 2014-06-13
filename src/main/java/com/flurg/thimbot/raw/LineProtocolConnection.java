@@ -27,7 +27,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
@@ -263,6 +265,15 @@ public final class LineProtocolConnection {
         synchronized (lock) {
             shutdown = true;
             lock.notify();
+        }
+    }
+
+    public String getServerName() {
+        SocketAddress address = socket.getRemoteSocketAddress();
+        if (address instanceof InetSocketAddress) {
+            return ((InetSocketAddress) address).getHostString();
+        } else {
+            return "server";
         }
     }
 
