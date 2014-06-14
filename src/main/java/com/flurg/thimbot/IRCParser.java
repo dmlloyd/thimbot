@@ -83,7 +83,10 @@ class IRCParser implements LineListener {
                 tokenize(is, ' ');
                 final String subCommand = tokenize(is, ' ');
                 switch (subCommand) {
-                    case "LIST":
+                    case "LIST": {
+                        // todo active capabilities
+                        break;
+                    }
                     case "LS": {
                         if (is.read() == ':') {
                             ArrayList<String> list = new ArrayList<>();

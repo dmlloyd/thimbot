@@ -22,6 +22,8 @@ import static java.lang.Math.min;
 
 import com.flurg.thimbot.event.AuthenticationRequestEvent;
 import com.flurg.thimbot.event.AuthenticationResponseEvent;
+import com.flurg.thimbot.event.CapabilityEndEvent;
+import com.flurg.thimbot.event.CapabilityRequestEvent;
 import com.flurg.thimbot.event.ChannelJoinRequestEvent;
 import com.flurg.thimbot.event.ChannelPartRequestEvent;
 import com.flurg.thimbot.event.ConnectEvent;
@@ -105,6 +107,7 @@ public final class ThimBot {
     });
 
     private final Set<String> joinedChannels = Collections.synchronizedSet(new TreeSet<String>());
+    private final Set<String> desiredCapabilities = Collections.synchronizedSet(new HashSet<String>());
 
     static void install(final ThimBot bot) {
         final Preferences preferences = bot.getPreferences().node("log");
@@ -207,6 +210,16 @@ public final class ThimBot {
 
     public String getServerName() {
         return connection.getServerName();
+    }
+
+    public void addDesiredCapability(final String name) {
+        desiredCapabilities.add(name);
+    }
+
+    public Set<String> getDesiredCapabilities() {
+        synchronized (desiredCapabilities) {
+            return new HashSet<>(desiredCapabilities);
+        }
     }
 
     static class SentBytes {
@@ -688,6 +701,59 @@ public final class ThimBot {
         }
         dispatch(new AuthenticationResponseEvent(this, response));
     }
+
+    // capabilities
+
+    void sendCapList() throws IOException {
+        synchronized (lock) {
+            getConnection().queueMessage(Priority.HIGH, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.CAP);
+                    target.write(' ');
+                    target.write(IRCStrings.LS);
+                }
+            });
+        }
+    }
+
+
+    void sendCapReq(final Set<String> desiredCapabilities) throws IOException {
+        final String[] caps = desiredCapabilities.toArray(new String[desiredCapabilities.size()]);
+        synchronized (lock) {
+            getConnection().queueMessage(Priority.HIGH, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.CAP);
+                    target.write(' ');
+                    if (caps.length == 0) {
+                        target.write(IRCStrings.END);
+                    } else {
+                        target.write(IRCStrings.REQ);
+                        target.write(' ');
+                        target.write(':');
+                        target.write(caps[0]);
+                        for (int i = 1; i < caps.length; i++) {
+                            target.write(' ');
+                            target.write(caps[i]);
+                        }
+                    }
+                }
+            });
+        }
+        dispatch(caps.length == 0 ? new CapabilityEndEvent(this) : new CapabilityRequestEvent(this, caps));
+    }
+
+    void sendCapEndNoDispatch() throws IOException {
+        synchronized (lock) {
+            getConnection().queueMessage(Priority.HIGH, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.CAP);
+                    target.write(' ');
+                    target.write(IRCStrings.END);
+                }
+            });
+        }
+    }
+
 
     private static IOException notConnected() {
         return new IOException("Not connected");

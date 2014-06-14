@@ -23,17 +23,22 @@ import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.event.AuthenticationChallengeEvent;
 import com.flurg.thimbot.event.AuthenticationFailedEvent;
 import com.flurg.thimbot.event.AuthenticationRequestEvent;
 import com.flurg.thimbot.event.AuthenticationResponseEvent;
+import com.flurg.thimbot.event.CapabilityAckEvent;
+import com.flurg.thimbot.event.CapabilityRequestEvent;
 import com.flurg.thimbot.event.ConnectEvent;
+import com.flurg.thimbot.event.ConnectRequestEvent;
 import com.flurg.thimbot.event.DisconnectEvent;
 import com.flurg.thimbot.event.Event;
 import com.flurg.thimbot.event.EventHandler;
 import com.flurg.thimbot.event.EventHandlerContext;
 import com.flurg.thimbot.event.LoggedInEvent;
 import com.flurg.thimbot.event.LoggedOutEvent;
+import com.flurg.thimbot.event.PrivateNoticeEvent;
 import com.flurg.thimbot.event.SaslMechanismListEvent;
 import com.flurg.thimbot.util.Arrays2;
 import javax.security.auth.callback.Callback;
@@ -56,6 +61,9 @@ public class AuthenticationHandler extends EventHandler {
     private static final int STATE_AUTH_QUERY = 0;
     private static final int STATE_AUTH_REQ = 1;
     private static final int STATE_AUTH_DONE = 2;
+    private static final int STATE_NO_SASL = 3;
+    private final String userName;
+    private final char[] password;
 
     volatile int state = 0;
 
@@ -65,6 +73,8 @@ public class AuthenticationHandler extends EventHandler {
     private SaslClient client;
 
     public AuthenticationHandler(final String userName, final char[] password) {
+        this.userName = userName;
+        this.password = password;
         callbackHandler = new CallbackHandler() {
             public void handle(final Callback[] callbacks) throws IOException, UnsupportedCallbackException {
                 for (Callback callback : callbacks) {
@@ -82,6 +92,34 @@ public class AuthenticationHandler extends EventHandler {
         };
     }
 
+    public void handleEvent(final EventHandlerContext context, final CapabilityAckEvent event) throws Exception {
+        if (event.getCapabilities().contains("sasl")) {
+            initial(event);
+        } else {
+            state = STATE_NO_SASL;
+        }
+        super.handleEvent(context, event);
+    }
+
+    public void handleEvent(final EventHandlerContext context, final PrivateNoticeEvent event) throws Exception {
+        if (event.getFromNick().equals("NickServ")) {
+            if (event.getText().startsWith("This nickname is registered.")) {
+                event.getBot().sendMessage(Priority.HIGH, "NickServ", String.format("identify %s %s", userName, password));
+            } else if (event.getText().startsWith("You are now identified for")) {
+                state = STATE_AUTH_DONE;
+                super.handleEvent(context, new LoggedInEvent(event.getBot(), event.getText()));
+            } else {
+                super.handleEvent(context, event);
+            }
+        } else {
+            super.handleEvent(context, event);
+        }
+    }
+
+    public void handleEvent(final EventHandlerContext context, final ConnectRequestEvent event) throws Exception {
+        event.getBot().addDesiredCapability("sasl");
+    }
+
     public void handleEvent(final EventHandlerContext context, final ConnectEvent event) throws Exception {
         synchronized (mechanisms) {
             mechanisms.clear();
@@ -90,7 +128,6 @@ public class AuthenticationHandler extends EventHandler {
                 client = null;
             }
         }
-        initial(event);
         super.handleEvent(context, event);
     }
 
@@ -133,7 +170,10 @@ public class AuthenticationHandler extends EventHandler {
 
     public void handleEvent(final EventHandlerContext context, final LoggedInEvent event) throws Exception {
         synchronized (mechanisms) {
-            client = null;
+            if (client != null) {
+                client.dispose();
+                client = null;
+            }
             mechanisms.clear();
         }
         state = STATE_AUTH_DONE;

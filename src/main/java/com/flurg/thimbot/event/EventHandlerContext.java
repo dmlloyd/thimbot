@@ -18,6 +18,8 @@
 
 package com.flurg.thimbot.event;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -32,6 +34,7 @@ public final class EventHandlerContext {
     private final List<EventHandler> chain;
     private final ListIterator<EventHandler> iterator;
     private final Map<HandlerKey<?>, Object> contextMap = new HashMap<>();
+    private final Deque<Event> pending = new ArrayDeque<>();
 
     /**
      * Construct a new instance.
@@ -52,7 +55,7 @@ public final class EventHandlerContext {
     public void next(Event event) {
         if (iterator.hasNext()) try {
             event.dispatch(this, iterator.next());
-        } catch (Exception e) {
+        } catch (Throwable e) {
             e.printStackTrace();
         } finally {
             iterator.previous();
@@ -76,12 +79,27 @@ public final class EventHandlerContext {
         return (T) contextMap.put(key, value);
     }
 
+    private static final ThreadLocal<EventHandlerContext> C = new ThreadLocal<>();
+
     /**
      * Re-dispatch the given event to the start of the chain.
      *
      * @param event the event
      */
     public void redispatch(Event event) {
-        new EventHandlerContext(chain).next(event);
+        EventHandlerContext current = C.get();
+        if (current != null) {
+            current.pending.add(event);
+        } else {
+            EventHandlerContext context = new EventHandlerContext(chain);
+            C.set(context);
+            try {
+                do {
+                    context.next(event);
+                } while ((event = pending.pollFirst()) != null);
+            } finally {
+                C.remove();
+            }
+        }
     }
 }

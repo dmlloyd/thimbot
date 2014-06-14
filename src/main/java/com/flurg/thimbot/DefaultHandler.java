@@ -18,9 +18,18 @@
 
 package com.flurg.thimbot;
 
+import java.util.Set;
+
+import com.flurg.thimbot.event.CapabilityAckEvent;
+import com.flurg.thimbot.event.CapabilityEndEvent;
+import com.flurg.thimbot.event.CapabilityListEvent;
+import com.flurg.thimbot.event.CapabilityListRequestEvent;
+import com.flurg.thimbot.event.CapabilityNakEvent;
+import com.flurg.thimbot.event.CapabilityRequestEvent;
 import com.flurg.thimbot.event.ChannelJoinEvent;
 import com.flurg.thimbot.event.ChannelKickEvent;
 import com.flurg.thimbot.event.ChannelPartEvent;
+import com.flurg.thimbot.event.ConnectEvent;
 import com.flurg.thimbot.event.DisconnectEvent;
 import com.flurg.thimbot.event.EventHandler;
 import com.flurg.thimbot.event.EventHandlerContext;
@@ -39,6 +48,44 @@ import com.flurg.thimbot.raw.StringEmitter;
 final class DefaultHandler extends EventHandler {
 
     // connection
+
+    public void handleEvent(final EventHandlerContext context, final ConnectEvent event) throws Exception {
+        event.getBot().sendCapList();
+        super.handleEvent(context, event);
+    }
+
+    public void handleEvent(final EventHandlerContext context, final CapabilityAckEvent event) throws Exception {
+        event.getBot().sendCapEndNoDispatch();
+        super.handleEvent(context, event);
+        super.handleEvent(context, new CapabilityEndEvent(event.getBot()));
+    }
+
+    public void handleEvent(final EventHandlerContext context, final CapabilityEndEvent event) throws Exception {
+        super.handleEvent(context, event);
+    }
+
+    public void handleEvent(final EventHandlerContext context, final CapabilityListEvent event) throws Exception {
+        Set<String> capabilities = event.getCapabilities();
+        super.handleEvent(context, event);
+        Set<String> desiredCapabilities = event.getBot().getDesiredCapabilities();
+        desiredCapabilities.retainAll(capabilities);
+        event.getBot().sendCapReq(desiredCapabilities);
+    }
+
+    public void handleEvent(final EventHandlerContext context, final CapabilityListRequestEvent event) throws Exception {
+        super.handleEvent(context, event);
+    }
+
+    public void handleEvent(final EventHandlerContext context, final CapabilityNakEvent event) throws Exception {
+        // not much we can do here...
+        event.getBot().sendCapEndNoDispatch();
+        super.handleEvent(context, event);
+        super.handleEvent(context, new CapabilityEndEvent(event.getBot()));
+    }
+
+    public void handleEvent(final EventHandlerContext context, final CapabilityRequestEvent event) throws Exception {
+        super.handleEvent(context, event);
+    }
 
     public void handleEvent(final EventHandlerContext context, final DisconnectEvent event) throws Exception {
         event.getBot().disconnect();

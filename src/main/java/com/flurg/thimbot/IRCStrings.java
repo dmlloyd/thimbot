@@ -27,6 +27,7 @@ public final class IRCStrings {
 
     public static final StringEmitter ACTION = new StringEmitter("ACTION");
     public static final StringEmitter AUTHENTICATE = new StringEmitter("AUTHENTICATE");
+    public static final StringEmitter CAP = new StringEmitter("CAP");
     public static final StringEmitter JOIN = new StringEmitter("JOIN");
     public static final StringEmitter MODE = new StringEmitter("MODE");
     public static final StringEmitter NICK = new StringEmitter("NICK");
@@ -37,6 +38,14 @@ public final class IRCStrings {
     public static final StringEmitter PRIVMSG = new StringEmitter("PRIVMSG");
     public static final StringEmitter QUIT = new StringEmitter("QUIT");
     public static final StringEmitter USER = new StringEmitter("USER");
+
+    public static final StringEmitter ACK = new StringEmitter("ACK");
+    public static final StringEmitter CLEAR = new StringEmitter("CLEAR");
+    public static final StringEmitter END = new StringEmitter("END");
+    public static final StringEmitter LIST = new StringEmitter("LIST");
+    public static final StringEmitter LS = new StringEmitter("LS");
+    public static final StringEmitter NAK = new StringEmitter("NAK");
+    public static final StringEmitter REQ = new StringEmitter("REQ");
 
     private IRCStrings() {
     }
