@@ -260,7 +260,6 @@ class IRCParser implements LineListener {
             case "PRIVMSG": {
                 if (IRCStringUtil.isUser(source)) {
                     is.mark(0);
-                    ch = is.read();
                     final String target = tokenize(is, ' ');
                     if (is.read() == ':') {
                         is.mark(0);
@@ -488,6 +487,7 @@ class IRCParser implements LineListener {
                 bot.dispatch(event);
                 break;
             }
+
             case "670": { // RPL_STARTTLS
                 // todo
                 // SSLSocketFactory f = ...;
@@ -512,6 +512,7 @@ class IRCParser implements LineListener {
                 }
                 break;
             }
+            case "462": // cannot reregister?
             case "902": // ERR_NICKLOCKED
             case "904": // ERR_SASLFAIL
             case "905": // ERR_SASLTOOLONG
@@ -587,9 +588,11 @@ class IRCParser implements LineListener {
         }
         ch = is.read();
         while (ch != ' ' && ch != -1) {
+            b.append((char) ch);
             if (ch == '!') {
                 ch = is.read();
                 while (ch != ' ' && ch != -1) {
+                    b.append((char) ch);
                     if (ch == '@') {
                         ch = is.read();
                         while (ch != ' ' && ch != -1) {
@@ -600,13 +603,11 @@ class IRCParser implements LineListener {
                         b.setLength(0);
                         return user;
                     } else {
-                        b.append((char) ch);
                         ch = is.read();
                     }
                 }
                 break;
             } else {
-                b.append((char) ch);
                 ch = is.read();
             }
         }

@@ -19,13 +19,11 @@
 package com.flurg.thimbot.event;
 
 import java.util.ArrayDeque;
-import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * The context for event handlers.
@@ -89,15 +87,15 @@ public final class EventHandlerContext {
      * @param event the event
      */
     public void redispatch(Event event) {
+        if (event == null) return;
         EventHandlerContext current = C.get();
         if (current != null) {
             current.pending.add(event);
         } else {
-            EventHandlerContext context = new EventHandlerContext(chain);
-            C.set(context);
+            C.set(this);
             try {
                 do {
-                    context.next(event);
+                    next(event);
                 } while ((event = pending.pollFirst()) != null);
             } finally {
                 C.remove();

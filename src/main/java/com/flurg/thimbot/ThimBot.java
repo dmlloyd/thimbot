@@ -261,14 +261,14 @@ public final class ThimBot {
             final Socket socket = socketFactory.createSocket(hostName, inetSocketAddress.getPort());
             socket.setTcpNoDelay(true);
             final LineProtocolConnection connection = new LineProtocolConnection(this, new IRCParser(), socket, 16384);
-            connection.queueMessage(Priority.HIGH, new LineOutputCallback() {
+            connection.queueMessage(Priority.NORMAL, new LineOutputCallback() {
                 public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
                     target.write(IRCStrings.NICK);
                     target.write(' ');
                     target.write(desiredNick.getBytes(StandardCharsets.ISO_8859_1));
                 }
             });
-            connection.queueMessage(Priority.HIGH, new LineOutputCallback() {
+            connection.queueMessage(Priority.NORMAL, new LineOutputCallback() {
                 public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
                     target.write(IRCStrings.USER);
                     target.write(' ');
@@ -333,7 +333,7 @@ public final class ThimBot {
 
     public void disconnect() throws IOException {
         synchronized (lock) {
-            connection.terminate();
+            if (connection != null) connection.terminate();
         }
         dispatch(new DisconnectRequestEvent(this));
     }
@@ -375,11 +375,11 @@ public final class ThimBot {
             if (baos.size() + current.length() >= 256) {
                 // flush
                 baos.write(' ');
+                baos.write(':');
                 if (cmdType != CmdType.SIMPLE) {
                     baos.write(1);
                     command.emit((ByteArrayOutputStream) baos);
                     baos.write(' ');
-                    baos.write(':');
                     message.emit((ByteArrayOutputStream) baos);
                     baos.write(1);
                 } else {
@@ -404,7 +404,16 @@ public final class ThimBot {
             }
         } while (iterator.hasNext());
         baos.write(' ');
-        message.emit((ByteArrayOutputStream) baos);
+        baos.write(':');
+        if (cmdType != CmdType.SIMPLE) {
+            baos.write(1);
+            command.emit((ByteArrayOutputStream) baos);
+            baos.write(' ');
+            message.emit((ByteArrayOutputStream) baos);
+            baos.write(1);
+        } else {
+            message.emit((ByteArrayOutputStream) baos);
+        }
         synchronized (lock) {
             getConnection().queueMessage(priority, baos);
         }

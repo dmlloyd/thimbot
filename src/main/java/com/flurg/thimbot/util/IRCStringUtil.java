@@ -32,7 +32,7 @@ public final class IRCStringUtil {
         "(?:" +
             "[\\x02\\x0F\\x11\\x12\\x16\\x1d\\x1f]" + // single character color codes
             "|" +
-            "\\x03\\d{0,2},\\d{0,2}" + // standard mIRC colors
+            "\\x03\\d{0,2}(?:,\\d{0,2})?" + // standard mIRC colors
             "|" +
             "\\x04[0-9a-fA-F]{6}" + // VisualIRC-style RGB codes
             "|" +

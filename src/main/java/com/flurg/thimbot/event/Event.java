@@ -59,6 +59,9 @@ public abstract class Event implements CommonEvent {
         if (this instanceof MultiTargetEvent) {
             b.append(" to ").append(Arrays.toString(((MultiTargetEvent)this).getTargets().toArray()));
         }
+        if (this instanceof ChannelEvent) {
+            b.append(" of channel ").append(((ChannelEvent) this).getChannel());
+        }
         if (this instanceof MessageRespondableEvent) {
             b.append(" responses to ").append(Arrays.toString(((MessageRespondableEvent)this).getResponseTargets()));
         }

@@ -104,7 +104,7 @@ public class AuthenticationHandler extends EventHandler {
     public void handleEvent(final EventHandlerContext context, final PrivateNoticeEvent event) throws Exception {
         if (event.getFromNick().equals("NickServ")) {
             if (event.getText().startsWith("This nickname is registered.")) {
-                event.getBot().sendMessage(Priority.HIGH, "NickServ", String.format("identify %s %s", userName, password));
+                event.getBot().sendMessage(Priority.HIGH, "NickServ", String.format("identify %s %s", userName, new String(password)));
             } else if (event.getText().startsWith("You are now identified for")) {
                 state = STATE_AUTH_DONE;
                 super.handleEvent(context, new LoggedInEvent(event.getBot(), event.getText()));
@@ -196,7 +196,7 @@ public class AuthenticationHandler extends EventHandler {
         for (;;) {
             final String mechanismName = mechanisms.pollFirst();
             if (mechanismName == null) {
-                event.getBot().disconnect();
+                state = STATE_NO_SASL;
                 return;
             }
             client = Sasl.createSaslClient(Arrays2.of(mechanismName), null, "irc", event.getBot().getServerName(), Collections.<String, Object>emptyMap(), callbackHandler);
