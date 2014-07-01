@@ -117,7 +117,7 @@ public class AuthenticationHandler extends EventHandler {
     }
 
     public void handleEvent(final EventHandlerContext context, final ConnectRequestEvent event) throws Exception {
-        event.getBot().addDesiredCapability("sasl");
+//        event.getBot().addDesiredCapability("sasl");
     }
 
     public void handleEvent(final EventHandlerContext context, final ConnectEvent event) throws Exception {

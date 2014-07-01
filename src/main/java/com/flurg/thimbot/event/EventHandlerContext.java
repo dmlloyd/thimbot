@@ -87,6 +87,7 @@ public final class EventHandlerContext {
      * @param event the event
      */
     public void redispatch(Event event) {
+        System.out.printf("Dispatching %s%n", event);
         if (event == null) return;
         EventHandlerContext current = C.get();
         if (current != null) {

@@ -354,6 +354,7 @@ public final class ThimBot {
             return;
         }
         // we will limit the cmd + target list to <= 256 characters, and the message to <= 256 characters (or whatever the server will accept).
+        // we limit recipients to 4 at a time
         final Iterator<String> iterator = targets.iterator();
         assert iterator.hasNext();
 
@@ -370,9 +371,13 @@ public final class ThimBot {
         }
         baos.write(' ');
         nickEmitter.emit((ByteArrayOutputStream) baos);
+        int c = 1;
+        int t = 0;
         do {
             current = new StringEmitter(iterator.next());
-            if (baos.size() + current.length() >= 256) {
+            if (current.length() == 0) continue;
+            t ++;
+            if (baos.size() + current.length() >= 256 || c == 4) {
                 // flush
                 baos.write(' ');
                 baos.write(':');
@@ -385,7 +390,9 @@ public final class ThimBot {
                 } else {
                     message.emit((ByteArrayOutputStream) baos);
                 }
-                getConnection().queueMessage(priority, baos);
+                synchronized (lock) {
+                    getConnection().queueMessage(priority, baos);
+                }
                 baos = new EmittableByteArrayOutputStream(256);
                 if (cmdType == CmdType.CTCP_PRIVMSG) {
                     IRCStrings.PRIVMSG.emit((ByteArrayOutputStream) baos);
@@ -397,12 +404,14 @@ public final class ThimBot {
                     throw new IllegalStateException();
                 }
                 baos.write(' ');
-                current.emit((ByteArrayOutputStream) baos);
-            } else {
-                baos.write(',');
-                current.emit((ByteArrayOutputStream) baos);
+                nickEmitter.emit((ByteArrayOutputStream) baos);
+                c = 1;
             }
+            baos.write(',');
+            current.emit((ByteArrayOutputStream) baos);
+            c ++;
         } while (iterator.hasNext());
+        if (t == 0) return;
         baos.write(' ');
         baos.write(':');
         if (cmdType != CmdType.SIMPLE) {
