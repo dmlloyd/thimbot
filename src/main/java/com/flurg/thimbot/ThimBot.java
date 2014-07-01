@@ -208,6 +208,12 @@ public final class ThimBot {
         joinedChannels.remove(channel);
     }
 
+    public Set<String> getJoinedChannels() {
+        synchronized (joinedChannels) {
+            return new HashSet<>(joinedChannels);
+        }
+    }
+
     public String getServerName() {
         return connection.getServerName();
     }
@@ -282,16 +288,8 @@ public final class ThimBot {
         dispatch(new ConnectEvent(this));
     }
 
-    public EventHandlerContext createEventHandlerContext() {
-        return new EventHandlerContext(handlers);
-    }
-
     public void dispatch(final Event event) {
-        dispatch(createEventHandlerContext(), event);
-    }
-
-    public void dispatch(final EventHandlerContext context, final Event event) {
-        context.next(event);
+        EventHandlerContext.dispatch(handlers, event);
     }
 
     public void queueMessage(final Priority priority, final LineOutputCallback callback) {
