@@ -50,6 +50,8 @@ public abstract class Event implements CommonEvent {
         return bot;
     }
 
+    protected void toStringAddendum(StringBuilder b) {}
+
     public String toString() {
         StringBuilder b = new StringBuilder();
         b.append(getClass().getSimpleName());
@@ -64,6 +66,10 @@ public abstract class Event implements CommonEvent {
         }
         if (this instanceof MessageRespondableEvent) {
             b.append(" responses to ").append(Arrays.toString(((MessageRespondableEvent)this).getResponseTargets()));
+        }
+        toStringAddendum(b);
+        if (this instanceof TextEvent) {
+            b.append(" (\"").append(((TextEvent)this).getText()).append("\")");
         }
         return b.toString();
     }

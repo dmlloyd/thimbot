@@ -21,6 +21,7 @@ package com.flurg.thimbot;
 import com.flurg.thimbot.event.AccountChangeEvent;
 import com.flurg.thimbot.event.AuthenticationChallengeEvent;
 import com.flurg.thimbot.event.AuthenticationFailedEvent;
+import com.flurg.thimbot.event.ChannelActionEvent;
 import com.flurg.thimbot.event.IRCBase64;
 import com.flurg.thimbot.event.LoggedInEvent;
 import com.flurg.thimbot.event.ChannelCTCPCommandEvent;
@@ -38,6 +39,7 @@ import com.flurg.thimbot.event.LoggedOutEvent;
 import com.flurg.thimbot.event.MOTDEndEvent;
 import com.flurg.thimbot.event.MOTDLineEvent;
 import com.flurg.thimbot.event.NickChangeEvent;
+import com.flurg.thimbot.event.PrivateActionEvent;
 import com.flurg.thimbot.event.PrivateCTCPCommandEvent;
 import com.flurg.thimbot.event.PrivateCTCPResponseEvent;
 import com.flurg.thimbot.event.PrivateMessageEvent;
@@ -270,6 +272,15 @@ class IRCParser implements LineListener {
                                     final UserPongEvent event = new UserPongEvent(bot, source, tokenize(is, (char) 1));
                                     bot.dispatch(event);
                                     break;
+                                }
+                                case "ACTION": {
+                                    final Event event;
+                                    if (IRCStringUtil.isChannel(target)) {
+                                        event = new ChannelActionEvent(bot, source, target, tokenize(is, (char) 1));
+                                    } else {
+                                        event = new PrivateActionEvent(bot, source, tokenize(is, (char) 1));
+                                    }
+                                    bot.dispatch(event);
                                 }
                                 default: {
                                     final Event event;

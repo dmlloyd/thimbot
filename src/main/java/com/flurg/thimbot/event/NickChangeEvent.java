@@ -55,6 +55,10 @@ public final class NickChangeEvent extends Event implements FromUserEvent, Inbou
         return fromMe;
     }
 
+    protected void toStringAddendum(final StringBuilder b) {
+        b.append(" to ").append(newNick);
+    }
+
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
     }
