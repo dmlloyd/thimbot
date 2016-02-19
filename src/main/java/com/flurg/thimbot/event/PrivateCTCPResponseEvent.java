@@ -64,7 +64,7 @@ public final class PrivateCTCPResponseEvent extends Event implements FromUserEve
         return argument;
     }
 
-    public String toString() {
-        return super.toString() + ' ' + command + " \"" + argument + "\"";
+    protected void toStringAddendum(final StringBuilder b) {
+        b.append(" cmd=").append(command).append(" \"").append(argument).append('"');
     }
 }

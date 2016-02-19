@@ -70,8 +70,4 @@ public final class ChannelPartEvent extends Event implements FromUserEvent, Chan
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
     }
-
-    public String toString() {
-        return super.toString() + " \"" + reason + "\"";
-    }
 }

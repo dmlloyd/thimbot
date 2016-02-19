@@ -53,7 +53,7 @@ public final class OutboundCTCPResponseEvent extends Event implements OutboundEv
         return argument;
     }
 
-    public String toString() {
-        return super.toString() + ' ' + command + " \"" + argument + "\"";
+    protected void toStringAddendum(final StringBuilder b) {
+        b.append(" cmd=").append(command).append(" \"").append(argument).append('"');
     }
 }

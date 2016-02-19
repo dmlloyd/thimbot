@@ -23,23 +23,13 @@ import com.flurg.thimbot.ThimBot;
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class ErrorEvent extends Event implements InboundEvent {
-    private final String description;
+public final class ErrorEvent extends AbstractTextEvent implements InboundEvent, TextEvent {
 
     public ErrorEvent(final ThimBot bot, final String description) {
-        super(bot);
-        this.description = description;
+        super(bot, description);
     }
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public String toString() {
-        return super.toString() + " \"" + description + "\"";
     }
 }

@@ -24,29 +24,17 @@ import com.flurg.thimbot.util.IRCStringUtil;
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class QuitEvent extends Event implements FromUserEvent, InboundEvent {
+public final class QuitEvent extends AbstractTextEvent implements FromUserEvent, InboundEvent, TextEvent {
 
     private final String nick;
     private final String user;
-    private final String rawReason;
-    private final String reason;
     private final boolean fromMe;
 
     public QuitEvent(final ThimBot bot, final String user, final String rawReason) {
-        super(bot);
+        super(bot, rawReason);
         this.user = user;
         nick = IRCStringUtil.nickOf(user);
-        this.rawReason = rawReason;
-        reason = IRCStringUtil.deformat(rawReason);
         fromMe = getBot().getBotNick().equals(nick);
-    }
-
-    public String getReason() {
-        return reason;
-    }
-
-    public String getRawReason() {
-        return rawReason;
     }
 
     public String getFromNick() {
@@ -63,9 +51,5 @@ public final class QuitEvent extends Event implements FromUserEvent, InboundEven
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
-    }
-
-    public String toString() {
-        return super.toString() + " \"" + reason + "\"";
     }
 }

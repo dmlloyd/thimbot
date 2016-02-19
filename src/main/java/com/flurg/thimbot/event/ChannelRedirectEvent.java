@@ -55,6 +55,10 @@ public final class ChannelRedirectEvent extends Event implements ChannelEvent, I
         return to;
     }
 
+    protected void toStringAddendum(final StringBuilder b) {
+        b.append(" to ").append(to);
+    }
+
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
     }

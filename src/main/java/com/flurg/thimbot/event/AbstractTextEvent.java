@@ -42,8 +42,4 @@ public abstract class AbstractTextEvent extends Event implements TextEvent {
     public String getText() {
         return message;
     }
-
-    public String toString() {
-        return super.toString() + " \"" + message + "\"";
-    }
 }
