@@ -30,9 +30,11 @@ import com.flurg.thimbot.ThimBot;
 public final class OutboundActionEvent extends AbstractTextEvent implements OutboundEvent, MultiTargetEvent, MessageRespondableEvent {
 
     private final Set<String> targets;
+    private final Priority priority;
 
-    public OutboundActionEvent(final ThimBot bot, final Set<String> targets, final String rawMessage) {
+    public OutboundActionEvent(final ThimBot bot, final Priority priority, final Set<String> targets, final String rawMessage) {
         super(bot, rawMessage);
+        this.priority = priority;
         this.targets = targets;
     }
 
@@ -63,5 +65,9 @@ public final class OutboundActionEvent extends AbstractTextEvent implements Outb
 
     public String[] getResponseTargets() {
         return targets.toArray(new String[targets.size()]);
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

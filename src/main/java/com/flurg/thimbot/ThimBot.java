@@ -252,7 +252,7 @@ public final class ThimBot {
     }
 
     public void connect() throws IOException {
-        dispatch(new ConnectRequestEvent(this));
+        dispatch(new ConnectRequestEvent(this, Priority.NORMAL));
         synchronized (lock) {
             if (connection != null) {
                 throw new IllegalStateException("Already connected");
@@ -337,7 +337,7 @@ public final class ThimBot {
         synchronized (lock) {
             if (connection != null) connection.terminate();
         }
-        dispatch(new DisconnectRequestEvent(this));
+        dispatch(new DisconnectRequestEvent(this, Priority.NORMAL));
     }
 
     enum CmdType {
@@ -435,13 +435,13 @@ public final class ThimBot {
     public void sendMessage(final Priority priority, final Collection<String> targets, final String message) throws IOException {
         HashSet<String> set = new HashSet<>(targets);
         sendRawMultiTarget(priority, CmdType.SIMPLE, set, IRCStrings.PRIVMSG, new StringEmitter(message));
-        dispatch(new OutboundMessageEvent(this, set, message));
+        dispatch(new OutboundMessageEvent(this, priority, set, message));
     }
 
     public void sendMessage(final Priority priority, final String target, final String message, final boolean redispatch) throws IOException {
         Set<String> set = Collections.singleton(target);
         sendRawMultiTarget(priority, CmdType.SIMPLE, set, IRCStrings.PRIVMSG, new StringEmitter(message));
-        if (redispatch) dispatch(new OutboundMessageEvent(this, set, message));
+        if (redispatch) dispatch(new OutboundMessageEvent(this, priority, set, message));
     }
 
     public void sendMessage(final String target, final String message, final boolean redispatch) throws IOException {
@@ -465,13 +465,13 @@ public final class ThimBot {
     public void sendAction(final Priority priority, final Collection<String> targets, final String message) throws IOException {
         Set<String> set = new HashSet<>(targets);
         sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, IRCStrings.ACTION, new StringEmitter(message));
-        dispatch(new OutboundActionEvent(this, set, message));
+        dispatch(new OutboundActionEvent(this, priority, set, message));
     }
 
     public void sendAction(final Priority priority, final String target, final String message) throws IOException {
         Set<String> set = Collections.singleton(target);
         sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, IRCStrings.ACTION, new StringEmitter(message));
-        dispatch(new OutboundActionEvent(this, set, message));
+        dispatch(new OutboundActionEvent(this, priority, set, message));
     }
 
     public void sendAction(final String target, final String message) throws IOException {
@@ -483,7 +483,7 @@ public final class ThimBot {
     public void sendNotice(final Priority priority, final String target, final String message) throws IOException {
         Set<String> set = Collections.singleton(target);
         sendRawMultiTarget(priority, CmdType.SIMPLE, set, IRCStrings.NOTICE, new StringEmitter(message));
-        dispatch(new OutboundNoticeEvent(this, set, message));
+        dispatch(new OutboundNoticeEvent(this, priority, set, message));
     }
 
     public void sendNotice(final String target, final String message) throws IOException {
@@ -495,13 +495,13 @@ public final class ThimBot {
     public void sendCTCPCommand(final Priority priority, final String target, final StringEmitter command, final StringEmitter argument) throws IOException {
         Set<String> set = Collections.singleton(target);
         sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, command, argument);
-        dispatch(new OutboundCTCPCommandEvent(this, set, command.toString(), argument.toString()));
+        dispatch(new OutboundCTCPCommandEvent(this, priority, set, command.toString(), argument.toString()));
     }
 
     public void sendCTCPCommand(final Priority priority, final String target, final String command, final String argument) throws IOException {
         Set<String> set = Collections.singleton(target);
         sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, new StringEmitter(command), new StringEmitter(argument));
-        dispatch(new OutboundCTCPCommandEvent(this, set, command, argument));
+        dispatch(new OutboundCTCPCommandEvent(this, priority, set, command, argument));
     }
 
     public void sendCTCPCommand(final String target, final String command, final String argument) throws IOException {
@@ -521,13 +521,13 @@ public final class ThimBot {
     public void sendCTCPResponse(final Priority priority, final String target, final StringEmitter response, final StringEmitter argument) throws IOException {
         Set<String> set = Collections.singleton(target);
         sendRawMultiTarget(priority, CmdType.CTCP_NOTICE, set, response, argument);
-        dispatch(new OutboundCTCPResponseEvent(this, set, response.toString(), argument.toString()));
+        dispatch(new OutboundCTCPResponseEvent(this, priority, set, response.toString(), argument.toString()));
     }
 
     public void sendCTCPResponse(final Priority priority, final String target, final String response, final String argument) throws IOException {
         Set<String> set = Collections.singleton(target);
         sendRawMultiTarget(priority, CmdType.CTCP_NOTICE, set, new StringEmitter(response), new StringEmitter(argument));
-        dispatch(new OutboundCTCPResponseEvent(this, set, response, argument));
+        dispatch(new OutboundCTCPResponseEvent(this, priority, set, response, argument));
     }
 
     public void sendCTCPResponse(final String target, final String response, final String argument) throws IOException {
@@ -595,7 +595,7 @@ public final class ThimBot {
                 }
             });
         }
-        dispatch(new ChannelJoinRequestEvent(this, channel));
+        dispatch(new ChannelJoinRequestEvent(this, priority, channel));
     }
 
     // part
@@ -619,7 +619,7 @@ public final class ThimBot {
                 }
             });
         }
-        dispatch(new ChannelPartRequestEvent(this, channel, reason));
+        dispatch(new ChannelPartRequestEvent(this, priority, channel, reason));
     }
 
     // topic
@@ -638,7 +638,7 @@ public final class ThimBot {
                 }
             });
         }
-        dispatch(new ChannelTopicRequestEvent(this, channel));
+        dispatch(new ChannelTopicRequestEvent(this, priority, channel));
     }
 
     public void sendTopicChangeRequest(final String channel, final String topic) throws IOException {
@@ -658,7 +658,7 @@ public final class ThimBot {
                 }
             });
         }
-        dispatch(new ChannelTopicChangeRequestEvent(this, channel, topic));
+        dispatch(new ChannelTopicChangeRequestEvent(this, priority, channel, topic));
     }
 
     // quit
@@ -688,7 +688,7 @@ public final class ThimBot {
                 }
             });
         }
-        dispatch(new QuitRequestEvent(this, reason));
+        dispatch(new QuitRequestEvent(this, priority, reason));
     }
 
     // mode
@@ -725,7 +725,7 @@ public final class ThimBot {
                 }
             });
         }
-        dispatch(new AuthenticationRequestEvent(this, mechanismName));
+        dispatch(new AuthenticationRequestEvent(this, priority, mechanismName));
     }
 
     // SASL response
@@ -756,7 +756,7 @@ public final class ThimBot {
                 });
             }
         }
-        dispatch(new AuthenticationResponseEvent(this, response));
+        dispatch(new AuthenticationResponseEvent(this, priority, response));
     }
 
     // capabilities
@@ -796,7 +796,7 @@ public final class ThimBot {
                 }
             });
         }
-        dispatch(caps.length == 0 ? new CapabilityEndEvent(this) : new CapabilityRequestEvent(this, caps));
+        dispatch(caps.length == 0 ? new CapabilityEndEvent(this, Priority.HIGH) : new CapabilityRequestEvent(this, Priority.HIGH, caps));
     }
 
     void sendCapEndNoDispatch() throws IOException {

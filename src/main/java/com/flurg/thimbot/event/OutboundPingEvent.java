@@ -20,17 +20,20 @@ package com.flurg.thimbot.event;
 
 import java.util.Set;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public final class OutboundPingEvent extends Event implements OutboundEvent, MultiTargetEvent {
+    private final Priority priority;
     private final Set<String> targets;
     private final String payload;
 
-    public OutboundPingEvent(final ThimBot bot, final Set<String> targets, final String payload) {
+    public OutboundPingEvent(final ThimBot bot, final Priority priority, final Set<String> targets, final String payload) {
         super(bot);
+        this.priority = priority;
         this.targets = targets;
         this.payload = payload;
     }
@@ -49,5 +52,9 @@ public final class OutboundPingEvent extends Event implements OutboundEvent, Mul
 
     public String toString() {
         return super.toString() + " \"" + payload + "\"";
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

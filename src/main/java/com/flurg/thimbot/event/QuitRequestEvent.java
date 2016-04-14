@@ -18,6 +18,7 @@
 
 package com.flurg.thimbot.event;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 import com.flurg.thimbot.util.IRCStringUtil;
 
@@ -26,11 +27,13 @@ import com.flurg.thimbot.util.IRCStringUtil;
  */
 public final class QuitRequestEvent extends Event implements OutboundEvent {
 
+    private final Priority priority;
     private final String rawReason;
     private final String reason;
 
-    public QuitRequestEvent(final ThimBot bot, final String rawReason) {
+    public QuitRequestEvent(final ThimBot bot, final Priority priority, final String rawReason) {
         super(bot);
+        this.priority = priority;
         this.rawReason = rawReason;
         reason = IRCStringUtil.deformat(rawReason);
     }
@@ -49,5 +52,9 @@ public final class QuitRequestEvent extends Event implements OutboundEvent {
 
     public String toString() {
         return super.toString() + " \"" + reason + "\"";
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

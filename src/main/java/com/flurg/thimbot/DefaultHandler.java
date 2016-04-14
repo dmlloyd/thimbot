@@ -57,7 +57,7 @@ final class DefaultHandler extends EventHandler {
     public void handleEvent(final EventHandlerContext context, final CapabilityAckEvent event) throws Exception {
         event.getBot().sendCapEndNoDispatch();
         super.handleEvent(context, event);
-        super.handleEvent(context, new CapabilityEndEvent(event.getBot()));
+        super.handleEvent(context, new CapabilityEndEvent(event.getBot(), Priority.NORMAL));
     }
 
     public void handleEvent(final EventHandlerContext context, final CapabilityEndEvent event) throws Exception {
@@ -80,7 +80,7 @@ final class DefaultHandler extends EventHandler {
         // not much we can do here...
         event.getBot().sendCapEndNoDispatch();
         super.handleEvent(context, event);
-        super.handleEvent(context, new CapabilityEndEvent(event.getBot()));
+        super.handleEvent(context, new CapabilityEndEvent(event.getBot(), Priority.NORMAL));
     }
 
     public void handleEvent(final EventHandlerContext context, final CapabilityRequestEvent event) throws Exception {

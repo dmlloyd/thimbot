@@ -20,6 +20,7 @@ package com.flurg.thimbot.event;
 
 import java.util.Set;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
@@ -27,10 +28,12 @@ import com.flurg.thimbot.ThimBot;
  */
 public final class OutboundNoticeEvent extends AbstractTextEvent implements OutboundEvent, MultiTargetEvent {
 
+    private final Priority priority;
     private final Set<String> targets;
 
-    public OutboundNoticeEvent(final ThimBot bot, final Set<String> targets, final String rawMessage) {
+    public OutboundNoticeEvent(final ThimBot bot, final Priority priority, final Set<String> targets, final String rawMessage) {
         super(bot, rawMessage);
+        this.priority = priority;
         this.targets = targets;
     }
 
@@ -40,5 +43,9 @@ public final class OutboundNoticeEvent extends AbstractTextEvent implements Outb
 
     public Set<String> getTargets() {
         return targets;
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

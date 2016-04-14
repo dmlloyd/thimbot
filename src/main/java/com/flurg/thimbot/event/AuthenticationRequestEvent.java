@@ -18,6 +18,7 @@
 
 package com.flurg.thimbot.event;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
@@ -26,9 +27,11 @@ import com.flurg.thimbot.ThimBot;
 public final class AuthenticationRequestEvent extends Event implements OutboundEvent {
 
     private final String mechanism;
+    private final Priority priority;
 
-    public AuthenticationRequestEvent(final ThimBot bot, final String mechanism) {
+    public AuthenticationRequestEvent(final ThimBot bot, final Priority priority, final String mechanism) {
         super(bot);
+        this.priority = priority;
         this.mechanism = mechanism;
     }
 
@@ -38,5 +41,9 @@ public final class AuthenticationRequestEvent extends Event implements OutboundE
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

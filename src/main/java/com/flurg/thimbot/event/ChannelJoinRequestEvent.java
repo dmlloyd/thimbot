@@ -18,6 +18,7 @@
 
 package com.flurg.thimbot.event;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
@@ -26,9 +27,11 @@ import com.flurg.thimbot.ThimBot;
 public final class ChannelJoinRequestEvent extends Event implements OutboundEvent, ChannelEvent {
 
     private final String channel;
+    private final Priority priority;
 
-    public ChannelJoinRequestEvent(final ThimBot bot, final String channel) {
+    public ChannelJoinRequestEvent(final ThimBot bot, final Priority priority, final String channel) {
         super(bot);
+        this.priority = priority;
         this.channel = channel;
     }
 
@@ -38,5 +41,9 @@ public final class ChannelJoinRequestEvent extends Event implements OutboundEven
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

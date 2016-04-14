@@ -18,6 +18,7 @@
 
 package com.flurg.thimbot.event;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
@@ -26,10 +27,12 @@ import com.flurg.thimbot.ThimBot;
 public final class OutboundAwayRequestEvent extends Event implements OutboundEvent {
 
     private final String awayMessage;
+    private final Priority priority;
 
-    public OutboundAwayRequestEvent(final ThimBot bot, final String awayMessage) {
+    public OutboundAwayRequestEvent(final ThimBot bot, final Priority priority, final String awayMessage) {
         super(bot);
         this.awayMessage = awayMessage;
+        this.priority = priority;
     }
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
@@ -38,5 +41,9 @@ public final class OutboundAwayRequestEvent extends Event implements OutboundEve
 
     public String getAwayMessage() {
         return awayMessage;
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

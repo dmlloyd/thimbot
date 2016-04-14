@@ -18,6 +18,7 @@
 
 package com.flurg.thimbot.event;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
@@ -25,11 +26,18 @@ import com.flurg.thimbot.ThimBot;
  */
 public final class CapabilityListRequestEvent extends Event implements OutboundEvent {
 
-    public CapabilityListRequestEvent(final ThimBot bot) {
+    private final Priority priority;
+
+    public CapabilityListRequestEvent(final ThimBot bot, final Priority priority) {
         super(bot);
+        this.priority = priority;
     }
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

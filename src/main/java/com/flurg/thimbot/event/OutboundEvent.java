@@ -18,8 +18,16 @@
 
 package com.flurg.thimbot.event;
 
+import com.flurg.thimbot.Priority;
+
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public interface OutboundEvent extends CommonEvent {
+    /**
+     * Get the priority of this event.
+     *
+     * @return the priority of this event
+     */
+    Priority getPriority();
 }

@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
@@ -31,14 +32,17 @@ import com.flurg.thimbot.ThimBot;
  */
 public final class CapabilityRequestEvent extends Event implements OutboundEvent {
     private final Set<String> capabilities;
+    private final Priority priority;
 
-    public CapabilityRequestEvent(final ThimBot bot, final String... capabilities) {
+    public CapabilityRequestEvent(final ThimBot bot, final Priority priority, final String... capabilities) {
         super(bot);
+        this.priority = priority;
         this.capabilities = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(capabilities)));
     }
 
-    public CapabilityRequestEvent(final ThimBot bot, final Collection<String> capabilities) {
+    public CapabilityRequestEvent(final ThimBot bot, final Priority priority, final Collection<String> capabilities) {
         super(bot);
+        this.priority = priority;
         this.capabilities = Collections.unmodifiableSet(new HashSet<>(capabilities));
     }
 
@@ -48,5 +52,9 @@ public final class CapabilityRequestEvent extends Event implements OutboundEvent
 
     public Set<String> getCapabilities() {
         return capabilities;
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

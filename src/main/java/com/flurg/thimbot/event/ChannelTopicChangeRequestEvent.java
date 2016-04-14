@@ -18,16 +18,19 @@
 
 package com.flurg.thimbot.event;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public final class ChannelTopicChangeRequestEvent extends AbstractTextEvent implements OutboundEvent, ChannelEvent {
+    private final Priority priority;
     private final String channel;
 
-    public ChannelTopicChangeRequestEvent(final ThimBot bot, final String channel, final String topic) {
+    public ChannelTopicChangeRequestEvent(final ThimBot bot, final Priority priority, final String channel, final String topic) {
         super(bot, topic);
+        this.priority = priority;
         this.channel = channel;
     }
 
@@ -37,5 +40,9 @@ public final class ChannelTopicChangeRequestEvent extends AbstractTextEvent impl
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

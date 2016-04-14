@@ -18,6 +18,7 @@
 
 package com.flurg.thimbot.event;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 import com.flurg.thimbot.util.IRCStringUtil;
 
@@ -26,12 +27,14 @@ import com.flurg.thimbot.util.IRCStringUtil;
  */
 public final class ChannelPartRequestEvent extends Event implements OutboundEvent, ChannelEvent, TextEvent {
 
+    private final Priority priority;
     private final String channel;
     private final String rawReason;
     private final String reason;
 
-    public ChannelPartRequestEvent(final ThimBot bot, final String channel, final String rawReason) {
+    public ChannelPartRequestEvent(final ThimBot bot, final Priority priority, final String channel, final String rawReason) {
         super(bot);
+        this.priority = priority;
         this.channel = channel;
         this.rawReason = rawReason;
         reason = IRCStringUtil.deformat(rawReason);
@@ -51,5 +54,9 @@ public final class ChannelPartRequestEvent extends Event implements OutboundEven
 
     public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
         handler.handleEvent(context, this);
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

@@ -20,18 +20,21 @@ package com.flurg.thimbot.event;
 
 import java.util.Set;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public final class OutboundCTCPResponseEvent extends Event implements OutboundEvent, MultiTargetEvent {
+    private final Priority priority;
     private final Set<String> targets;
     private final String command;
     private final String argument;
 
-    public OutboundCTCPResponseEvent(final ThimBot bot, final Set<String> targets, final String command, final String argument) {
+    public OutboundCTCPResponseEvent(final ThimBot bot, final Priority priority, final Set<String> targets, final String command, final String argument) {
         super(bot);
+        this.priority = priority;
         this.targets = targets;
         this.command = command;
         this.argument = argument;
@@ -55,5 +58,9 @@ public final class OutboundCTCPResponseEvent extends Event implements OutboundEv
 
     protected void toStringAddendum(final StringBuilder b) {
         b.append(" cmd=").append(command).append(" \"").append(argument).append('"');
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }

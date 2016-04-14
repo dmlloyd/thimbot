@@ -18,16 +18,19 @@
 
 package com.flurg.thimbot.event;
 
+import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public final class OutboundServerPongEvent extends Event implements OutboundEvent {
+    private final Priority priority;
     private final String payload;
 
-    public OutboundServerPongEvent(final ThimBot bot, final String payload) {
+    public OutboundServerPongEvent(final ThimBot bot, final Priority priority, final String payload) {
         super(bot);
+        this.priority = priority;
         this.payload = payload;
     }
 
@@ -41,5 +44,9 @@ public final class OutboundServerPongEvent extends Event implements OutboundEven
 
     public String toString() {
         return super.toString() + " \"" + payload + "\"";
+    }
+
+    public Priority getPriority() {
+        return priority;
     }
 }
