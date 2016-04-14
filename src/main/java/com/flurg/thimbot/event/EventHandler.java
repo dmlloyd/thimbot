@@ -262,4 +262,12 @@ public abstract class EventHandler {
     public void handleEvent(final EventHandlerContext context, final ChannelNoTopicEvent event) throws Exception {
         handleEvent(context, (Event) event);
     }
+
+    public void handleEvent(final EventHandlerContext context, final ChannelTopicRequestEvent event) throws Exception {
+        handleEvent(context, (Event) event);
+    }
+
+    public void handleEvent(final EventHandlerContext context, final ChannelTopicChangeRequestEvent event) throws Exception {
+        handleEvent(context, (Event) event);
+    }
 }

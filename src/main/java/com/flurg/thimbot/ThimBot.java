@@ -26,6 +26,8 @@ import com.flurg.thimbot.event.CapabilityEndEvent;
 import com.flurg.thimbot.event.CapabilityRequestEvent;
 import com.flurg.thimbot.event.ChannelJoinRequestEvent;
 import com.flurg.thimbot.event.ChannelPartRequestEvent;
+import com.flurg.thimbot.event.ChannelTopicChangeRequestEvent;
+import com.flurg.thimbot.event.ChannelTopicRequestEvent;
 import com.flurg.thimbot.event.ConnectEvent;
 import com.flurg.thimbot.event.ConnectRequestEvent;
 import com.flurg.thimbot.event.DisconnectEvent;
@@ -618,6 +620,45 @@ public final class ThimBot {
             });
         }
         dispatch(new ChannelPartRequestEvent(this, channel, reason));
+    }
+
+    // topic
+
+    public void sendTopicRequest(final String channel) throws IOException {
+        sendTopicRequest(Priority.NORMAL, channel);
+    }
+
+    public void sendTopicRequest(final Priority priority, final String channel) throws IOException {
+        synchronized (lock) {
+            getConnection().queueMessage(priority, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.TOPIC);
+                    target.write(' ');
+                    target.write(new StringEmitter(channel));
+                }
+            });
+        }
+        dispatch(new ChannelTopicRequestEvent(this, channel));
+    }
+
+    public void sendTopicChangeRequest(final String channel, final String topic) throws IOException {
+        sendTopicChangeRequest(Priority.NORMAL, channel, topic);
+    }
+
+    public void sendTopicChangeRequest(final Priority priority, final String channel, final String topic) throws IOException {
+        synchronized (lock) {
+            getConnection().queueMessage(priority, new LineOutputCallback() {
+                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
+                    target.write(IRCStrings.TOPIC);
+                    target.write(' ');
+                    target.write(new StringEmitter(channel));
+                    target.write(' ');
+                    target.write(':');
+                    target.write(topic.getBytes(getCharset()));
+                }
+            });
+        }
+        dispatch(new ChannelTopicChangeRequestEvent(this, channel, topic));
     }
 
     // quit

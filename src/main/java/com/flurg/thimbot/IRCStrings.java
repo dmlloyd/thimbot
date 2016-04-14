@@ -46,6 +46,7 @@ public final class IRCStrings {
     public static final StringEmitter LS = new StringEmitter("LS");
     public static final StringEmitter NAK = new StringEmitter("NAK");
     public static final StringEmitter REQ = new StringEmitter("REQ");
+    public static final StringEmitter TOPIC = new StringEmitter("TOPIC");
 
     private IRCStrings() {
     }
