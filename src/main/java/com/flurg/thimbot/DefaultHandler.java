@@ -65,7 +65,7 @@ final class DefaultHandler extends EventHandler {
     }
 
     public void handleEvent(final EventHandlerContext context, final CapabilityListEvent event) throws Exception {
-        Set<String> capabilities = event.getCapabilities();
+        Set<String> capabilities = event.getCapabilityNames();
         super.handleEvent(context, event);
         Set<String> desiredCapabilities = event.getBot().getDesiredCapabilities();
         desiredCapabilities.retainAll(capabilities);
