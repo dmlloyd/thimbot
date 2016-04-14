@@ -22,6 +22,8 @@ import com.flurg.thimbot.event.AccountChangeEvent;
 import com.flurg.thimbot.event.AuthenticationChallengeEvent;
 import com.flurg.thimbot.event.AuthenticationFailedEvent;
 import com.flurg.thimbot.event.ChannelActionEvent;
+import com.flurg.thimbot.event.ChannelNoTopicEvent;
+import com.flurg.thimbot.event.ChannelTopicEvent;
 import com.flurg.thimbot.event.IRCBase64;
 import com.flurg.thimbot.event.LoggedInEvent;
 import com.flurg.thimbot.event.ChannelCTCPCommandEvent;
@@ -326,6 +328,7 @@ class IRCParser implements LineListener {
                 break;
             }
             case "TOPIC": {
+                // should only be client to server, ignore
                 break;
             }
             case "WALLOPS": {
@@ -414,9 +417,21 @@ class IRCParser implements LineListener {
             }
 
             case "331": { // RPL_NOTOPIC: <channel> :No topic is set
+                final String channel = tokenize(is, ' ');
+                if (IRCStringUtil.isChannel(channel)) {
+                    if (is.read() == ':') {
+                        bot.dispatch(new ChannelNoTopicEvent(bot, channel));
+                    }
+                }
                 break;
             }
             case "332": { // RPL_TOPIC: <channel> :<topic>
+                final String channel = tokenize(is, ' ');
+                if (IRCStringUtil.isChannel(channel)) {
+                    if (is.read() == ':') {
+                        bot.dispatch(new ChannelTopicEvent(bot, channel, is.getRemaining(bot.getCharset())));
+                    }
+                }
                 break;
             }
             case "341": { // RPL_INVITING: <channel> <nick>
