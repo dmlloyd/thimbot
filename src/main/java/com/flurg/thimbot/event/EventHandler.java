@@ -270,4 +270,8 @@ public abstract class EventHandler {
     public void handleEvent(final EventHandlerContext context, final ChannelTopicChangeRequestEvent event) throws Exception {
         handleEvent(context, (Event) event);
     }
+
+    public void handleEvent(final EventHandlerContext context, final ChannelModeRequestEvent event) throws Exception {
+        handleEvent(context, (Event) event);
+    }
 }

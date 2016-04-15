@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2014 Red Hat, Inc., and individual contributors
+ * Copyright 2016 Red Hat, Inc., and individual contributors
  * as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,24 +18,31 @@
 
 package com.flurg.thimbot.event;
 
-import java.util.Comparator;
-
 import com.flurg.thimbot.Priority;
+import com.flurg.thimbot.ThimBot;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public interface OutboundEvent extends CommonEvent {
-    /**
-     * Get the priority of this event.
-     *
-     * @return the priority of this event
-     */
-    Priority getPriority();
+public final class ChannelModeRequestEvent extends Event implements OutboundEvent, ChannelEvent {
+    private final String channel;
+    private final Priority priority;
 
-    Comparator<OutboundEvent> PRIORITY_COMPARATOR = new Comparator<OutboundEvent>() {
-        public int compare(final OutboundEvent o1, final OutboundEvent o2) {
-            return o2.getPriority().compareTo(o1.getPriority());
-        }
-    };
+    public ChannelModeRequestEvent(final ThimBot bot, final Priority priority, final String channel) {
+        super(bot);
+        this.channel = channel;
+        this.priority = priority;
+    }
+
+    public String getChannel() {
+        return channel;
+    }
+
+    public Priority getPriority() {
+        return priority;
+    }
+
+    public void dispatch(final EventHandlerContext context, final EventHandler handler) throws Exception {
+        handler.handleEvent(context, this);
+    }
 }

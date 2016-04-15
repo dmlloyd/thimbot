@@ -23,15 +23,16 @@ import static java.lang.Math.min;
 import com.flurg.thimbot.event.AuthenticationRequestEvent;
 import com.flurg.thimbot.event.AuthenticationResponseEvent;
 import com.flurg.thimbot.event.CapabilityEndEvent;
+import com.flurg.thimbot.event.CapabilityListRequestEvent;
 import com.flurg.thimbot.event.CapabilityRequestEvent;
 import com.flurg.thimbot.event.ChannelJoinRequestEvent;
+import com.flurg.thimbot.event.ChannelModeRequestEvent;
 import com.flurg.thimbot.event.ChannelPartRequestEvent;
 import com.flurg.thimbot.event.ChannelTopicChangeRequestEvent;
 import com.flurg.thimbot.event.ChannelTopicRequestEvent;
 import com.flurg.thimbot.event.ConnectEvent;
 import com.flurg.thimbot.event.ConnectRequestEvent;
 import com.flurg.thimbot.event.DisconnectEvent;
-import com.flurg.thimbot.event.DisconnectRequestEvent;
 import com.flurg.thimbot.event.Event;
 import com.flurg.thimbot.event.EventHandler;
 import com.flurg.thimbot.event.EventHandlerContext;
@@ -41,6 +42,9 @@ import com.flurg.thimbot.event.OutboundCTCPCommandEvent;
 import com.flurg.thimbot.event.OutboundCTCPResponseEvent;
 import com.flurg.thimbot.event.OutboundMessageEvent;
 import com.flurg.thimbot.event.OutboundNoticeEvent;
+import com.flurg.thimbot.event.OutboundPingEvent;
+import com.flurg.thimbot.event.OutboundPongEvent;
+import com.flurg.thimbot.event.OutboundServerPongEvent;
 import com.flurg.thimbot.event.QuitRequestEvent;
 import com.flurg.thimbot.raw.AckEmittableByteArrayOutputStream;
 import com.flurg.thimbot.raw.ByteOutput;
@@ -337,7 +341,6 @@ public final class ThimBot {
         synchronized (lock) {
             if (connection != null) connection.terminate();
         }
-        dispatch(new DisconnectRequestEvent(this, Priority.NORMAL));
     }
 
     enum CmdType {
@@ -433,27 +436,15 @@ public final class ThimBot {
     // Message
 
     public void sendMessage(final Priority priority, final Collection<String> targets, final String message) throws IOException {
-        HashSet<String> set = new HashSet<>(targets);
-        sendRawMultiTarget(priority, CmdType.SIMPLE, set, IRCStrings.PRIVMSG, new StringEmitter(message));
-        dispatch(new OutboundMessageEvent(this, priority, set, message));
-    }
-
-    public void sendMessage(final Priority priority, final String target, final String message, final boolean redispatch) throws IOException {
-        Set<String> set = Collections.singleton(target);
-        sendRawMultiTarget(priority, CmdType.SIMPLE, set, IRCStrings.PRIVMSG, new StringEmitter(message));
-        if (redispatch) dispatch(new OutboundMessageEvent(this, priority, set, message));
-    }
-
-    public void sendMessage(final String target, final String message, final boolean redispatch) throws IOException {
-        sendMessage(Priority.NORMAL, target, message, redispatch);
+        dispatch(new OutboundMessageEvent(this, priority, new HashSet<>(targets), message));
     }
 
     public void sendMessage(final Priority priority, final String target, final String message) throws IOException {
-        sendMessage(priority, target, message, true);
+        dispatch(new OutboundMessageEvent(this, priority, Collections.singleton(target), message));
     }
 
     public void sendMessage(final String target, final String message) throws IOException {
-        sendMessage(Priority.NORMAL, target, message, true);
+        dispatch(new OutboundMessageEvent(this, Priority.NORMAL, Collections.singleton(target), message));
     }
 
     public void sendMessage(final Priority priority, final String[] targets, final String message) throws IOException {
@@ -463,15 +454,11 @@ public final class ThimBot {
     // Action
 
     public void sendAction(final Priority priority, final Collection<String> targets, final String message) throws IOException {
-        Set<String> set = new HashSet<>(targets);
-        sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, IRCStrings.ACTION, new StringEmitter(message));
-        dispatch(new OutboundActionEvent(this, priority, set, message));
+        dispatch(new OutboundActionEvent(this, priority, new HashSet<>(targets), message));
     }
 
     public void sendAction(final Priority priority, final String target, final String message) throws IOException {
-        Set<String> set = Collections.singleton(target);
-        sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, IRCStrings.ACTION, new StringEmitter(message));
-        dispatch(new OutboundActionEvent(this, priority, set, message));
+        dispatch(new OutboundActionEvent(this, priority, Collections.singleton(target), message));
     }
 
     public void sendAction(final String target, final String message) throws IOException {
@@ -481,9 +468,7 @@ public final class ThimBot {
     // Notice
 
     public void sendNotice(final Priority priority, final String target, final String message) throws IOException {
-        Set<String> set = Collections.singleton(target);
-        sendRawMultiTarget(priority, CmdType.SIMPLE, set, IRCStrings.NOTICE, new StringEmitter(message));
-        dispatch(new OutboundNoticeEvent(this, priority, set, message));
+        dispatch(new OutboundNoticeEvent(this, priority, Collections.singleton(target), message));
     }
 
     public void sendNotice(final String target, final String message) throws IOException {
@@ -492,23 +477,15 @@ public final class ThimBot {
 
     // CTCP command
 
-    public void sendCTCPCommand(final Priority priority, final String target, final StringEmitter command, final StringEmitter argument) throws IOException {
-        Set<String> set = Collections.singleton(target);
-        sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, command, argument);
-        dispatch(new OutboundCTCPCommandEvent(this, priority, set, command.toString(), argument.toString()));
-    }
-
     public void sendCTCPCommand(final Priority priority, final String target, final String command, final String argument) throws IOException {
-        Set<String> set = Collections.singleton(target);
-        sendRawMultiTarget(priority, CmdType.CTCP_PRIVMSG, set, new StringEmitter(command), new StringEmitter(argument));
-        dispatch(new OutboundCTCPCommandEvent(this, priority, set, command, argument));
+        dispatch(new OutboundCTCPCommandEvent(this, priority, Collections.singleton(target), command, argument));
     }
 
     public void sendCTCPCommand(final String target, final String command, final String argument) throws IOException {
         sendCTCPCommand(Priority.NORMAL, target, command, argument);
     }
 
-    private LineProtocolConnection getConnection() throws IOException {
+    LineProtocolConnection getConnection() throws IOException {
         final LineProtocolConnection connection = this.connection;
         if (connection == null) {
             throw notConnected();
@@ -518,16 +495,8 @@ public final class ThimBot {
 
     // CTCP response
 
-    public void sendCTCPResponse(final Priority priority, final String target, final StringEmitter response, final StringEmitter argument) throws IOException {
-        Set<String> set = Collections.singleton(target);
-        sendRawMultiTarget(priority, CmdType.CTCP_NOTICE, set, response, argument);
-        dispatch(new OutboundCTCPResponseEvent(this, priority, set, response.toString(), argument.toString()));
-    }
-
     public void sendCTCPResponse(final Priority priority, final String target, final String response, final String argument) throws IOException {
-        Set<String> set = Collections.singleton(target);
-        sendRawMultiTarget(priority, CmdType.CTCP_NOTICE, set, new StringEmitter(response), new StringEmitter(argument));
-        dispatch(new OutboundCTCPResponseEvent(this, priority, set, response, argument));
+        dispatch(new OutboundCTCPResponseEvent(this, priority, Collections.singleton(target), response, argument));
     }
 
     public void sendCTCPResponse(final String target, final String response, final String argument) throws IOException {
@@ -536,12 +505,8 @@ public final class ThimBot {
 
     // ping
 
-    public void sendPing(final Priority priority, final String target, final StringEmitter argument) throws IOException {
-        sendCTCPCommand(priority, target, IRCStrings.PING, argument);
-    }
-
     public void sendPing(final Priority priority, final String target, final String argument) throws IOException {
-        sendPing(priority, target, new StringEmitter(argument));
+        dispatch(new OutboundPingEvent(this, priority, Collections.singleton(target), argument));
     }
 
     public void sendPing(final String target, final String argument) throws IOException {
@@ -550,12 +515,8 @@ public final class ThimBot {
 
     // pong
 
-    public void sendPong(final Priority priority, final String target, final StringEmitter argument) throws IOException {
-        sendCTCPResponse(priority, target, IRCStrings.PING, argument);
-    }
-
     public void sendPong(final Priority priority, final String target, final String argument) throws IOException {
-        sendPong(priority, target, new StringEmitter(argument));
+        dispatch(new OutboundPongEvent(this, priority, Collections.singleton(target), argument));
     }
 
     public void sendPong(final String target, final String argument) throws IOException {
@@ -563,16 +524,7 @@ public final class ThimBot {
     }
 
     public void sendPong(final Priority priority, final String payload) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.PONG);
-                    target.write(' ');
-                    target.write(':');
-                    target.write(payload.getBytes(StandardCharsets.UTF_8));
-                }
-            });
-        }
+        dispatch(new OutboundServerPongEvent(this, priority, payload));
     }
 
     public void sendPong(final String payload) throws IOException {
@@ -586,15 +538,6 @@ public final class ThimBot {
     }
 
     public void sendJoin(final Priority priority, final String channel) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.JOIN);
-                    target.write(' ');
-                    target.write(new StringEmitter(channel));
-                }
-            });
-        }
         dispatch(new ChannelJoinRequestEvent(this, priority, channel));
     }
 
@@ -605,20 +548,6 @@ public final class ThimBot {
     }
 
     public void sendPart(final Priority priority, final String channel, final String reason) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.PART);
-                    target.write(' ');
-                    target.write(new StringEmitter(channel));
-                    if (reason != null) {
-                        target.write(' ');
-                        target.write(':');
-                        target.write(reason.getBytes(getCharset()));
-                    }
-                }
-            });
-        }
         dispatch(new ChannelPartRequestEvent(this, priority, channel, reason));
     }
 
@@ -629,15 +558,6 @@ public final class ThimBot {
     }
 
     public void sendTopicRequest(final Priority priority, final String channel) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.TOPIC);
-                    target.write(' ');
-                    target.write(new StringEmitter(channel));
-                }
-            });
-        }
         dispatch(new ChannelTopicRequestEvent(this, priority, channel));
     }
 
@@ -646,18 +566,6 @@ public final class ThimBot {
     }
 
     public void sendTopicChangeRequest(final Priority priority, final String channel, final String topic) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.TOPIC);
-                    target.write(' ');
-                    target.write(new StringEmitter(channel));
-                    target.write(' ');
-                    target.write(':');
-                    target.write(topic.getBytes(getCharset()));
-                }
-            });
-        }
         dispatch(new ChannelTopicChangeRequestEvent(this, priority, channel, topic));
     }
 
@@ -676,18 +584,6 @@ public final class ThimBot {
     }
 
     public void quit(Priority priority, final String reason) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.QUIT);
-                    if (reason != null) {
-                        target.write(' ');
-                        target.write(':');
-                        target.write(reason.getBytes(getCharset()));
-                    }
-                }
-            });
-        }
         dispatch(new QuitRequestEvent(this, priority, reason));
     }
 
@@ -698,15 +594,7 @@ public final class ThimBot {
     }
 
     public void sendModeRequest(final Priority priority, final String target) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput bo, final long seq) throws IOException {
-                    bo.write(IRCStrings.MODE);
-                    bo.write(' ');
-                    bo.write(target.getBytes(StandardCharsets.UTF_8));
-                }
-            });
-        }
+        dispatch(new ChannelModeRequestEvent(this, priority, target));
     }
 
     // SASL authenticate
@@ -716,15 +604,6 @@ public final class ThimBot {
     }
 
     public void saslAuthRequest(final Priority priority, final String mechanismName) throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(priority, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.AUTHENTICATE);
-                    target.write(' ');
-                    target.write(mechanismName);
-                }
-            });
-        }
         dispatch(new AuthenticationRequestEvent(this, priority, mechanismName));
     }
 
@@ -735,82 +614,20 @@ public final class ThimBot {
     }
 
     public void saslResponse(final Priority priority, final byte[] response) throws IOException {
-        synchronized (lock) {
-            final int length = response.length;
-            if (length == 0) {
-                getConnection().queueMessage(priority, new LineOutputCallback() {
-                    public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                        target.write(IRCStrings.AUTHENTICATE);
-                        target.write(' ');
-                        target.write('+');
-                    }
-                });
-            } else for (int i = 0; i < length; i += 400) {
-                final int start = i;
-                getConnection().queueMessage(priority, new LineOutputCallback() {
-                    public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                        target.write(IRCStrings.AUTHENTICATE);
-                        target.write(' ');
-                        IRCBase64.encode(response, start, min(400, length - start), target);
-                    }
-                });
-            }
-        }
         dispatch(new AuthenticationResponseEvent(this, priority, response));
     }
 
     // capabilities
 
     void sendCapList() throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(Priority.HIGH, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.CAP);
-                    target.write(' ');
-                    target.write(IRCStrings.LS);
-                }
-            });
-        }
+        dispatch(new CapabilityListRequestEvent(this, Priority.HIGH));
     }
 
 
     void sendCapReq(final Set<String> desiredCapabilities) throws IOException {
         final String[] caps = desiredCapabilities.toArray(new String[desiredCapabilities.size()]);
-        synchronized (lock) {
-            getConnection().queueMessage(Priority.HIGH, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.CAP);
-                    target.write(' ');
-                    if (caps.length == 0) {
-                        target.write(IRCStrings.END);
-                    } else {
-                        target.write(IRCStrings.REQ);
-                        target.write(' ');
-                        target.write(':');
-                        target.write(caps[0]);
-                        for (int i = 1; i < caps.length; i++) {
-                            target.write(' ');
-                            target.write(caps[i]);
-                        }
-                    }
-                }
-            });
-        }
         dispatch(caps.length == 0 ? new CapabilityEndEvent(this, Priority.HIGH) : new CapabilityRequestEvent(this, Priority.HIGH, caps));
     }
-
-    void sendCapEndNoDispatch() throws IOException {
-        synchronized (lock) {
-            getConnection().queueMessage(Priority.HIGH, new LineOutputCallback() {
-                public void writeLine(final ThimBot context, final ByteOutput target, final long seq) throws IOException {
-                    target.write(IRCStrings.CAP);
-                    target.write(' ');
-                    target.write(IRCStrings.END);
-                }
-            });
-        }
-    }
-
 
     private static IOException notConnected() {
         return new IOException("Not connected");
