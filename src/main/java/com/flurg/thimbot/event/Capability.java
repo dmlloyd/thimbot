@@ -18,6 +18,8 @@
 
 package com.flurg.thimbot.event;
 
+import java.util.Objects;
+
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
@@ -26,13 +28,15 @@ public final class Capability {
     private final boolean sticky;
     private final boolean disable;
     private final boolean ack;
+    private final String value;
     private final int hashCode;
 
-    public Capability(final String name, final boolean sticky, final boolean disable, final boolean ack) {
+    public Capability(final String name, final boolean sticky, final boolean disable, final boolean ack, final String value) {
         this.name = name;
         this.sticky = sticky;
         this.disable = disable;
         this.ack = ack;
+        this.value = value;
         int hashCode = name.hashCode();
         if (sticky) {
             hashCode += 5;
@@ -42,6 +46,9 @@ public final class Capability {
         }
         if (ack) {
             hashCode += 23;
+        }
+        if (value != null) {
+            hashCode = hashCode * 17 + value.hashCode();
         }
         this.hashCode = hashCode;
     }
@@ -79,7 +86,7 @@ public final class Capability {
      * @return {@code true} if they are equal, {@code false} otherwise
      */
     public boolean equals(Capability other) {
-        return this == other || other != null && hashCode == other.hashCode && name.equals(other.name) && sticky == other.sticky && disable == other.disable && ack == other.ack;
+        return this == other || other != null && hashCode == other.hashCode && name.equals(other.name) && sticky == other.sticky && disable == other.disable && ack == other.ack && Objects.equals(value, other.value);
     }
 
     public int hashCode() {
@@ -92,6 +99,7 @@ public final class Capability {
         if (sticky) b.append('=');
         if (ack) b.append('~');
         b.append(name);
+        if (value != null) b.append('=').append(value);
         return b.toString();
     }
 
@@ -113,7 +121,12 @@ public final class Capability {
                 ack = true;
                 idx = str.offsetByCodePoints(idx, 1);
             } else {
-                return new Capability(str.substring(idx), sticky, disable, ack);
+                final int eqIdx = str.indexOf('=', idx);
+                if (eqIdx == -1) {
+                    return new Capability(str.substring(idx), sticky, disable, ack, null);
+                } else {
+                    return new Capability(str.substring(idx, eqIdx), sticky, disable, ack, str.substring(eqIdx + 1));
+                }
             }
         }
         return null;
