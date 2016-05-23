@@ -72,15 +72,26 @@ import com.flurg.thimbot.raw.StringEmitter;
 final class DefaultHandler extends EventHandler {
     private static final String[] NO_STRINGS = new String[0];
 
+    private volatile boolean multiPrefix;
+    private volatile boolean accountNotify;
+    private volatile boolean extendedJoin;
+    private volatile boolean inviteNotify;
+
     // connection
 
     public void handleEvent(final EventHandlerContext context, final ConnectEvent event) throws Exception {
-        event.getBot().sendCapList();
+        multiPrefix = accountNotify = extendedJoin = inviteNotify = false;
+        context.redispatch(new CapabilityListRequestEvent(event.getBot(), Priority.HIGH));
         super.handleEvent(context, event);
     }
 
     public void handleEvent(final EventHandlerContext context, final CapabilityAckEvent event) throws Exception {
         super.handleEvent(context, event);
+        final Set<String> capabilities = event.getCapabilities();
+        multiPrefix |= capabilities.contains("multi-prefix");
+        accountNotify |= capabilities.contains("account-notify");
+        extendedJoin |= capabilities.contains("extended-join");
+        inviteNotify |= capabilities.contains("invite-notify");
         context.redispatch(new CapabilityEndEvent(event.getBot(), Priority.NORMAL));
     }
 
@@ -101,6 +112,10 @@ final class DefaultHandler extends EventHandler {
         super.handleEvent(context, event);
         Set<String> desiredCapabilities = event.getBot().getDesiredCapabilities();
         desiredCapabilities.retainAll(capabilities);
+        desiredCapabilities.remove("batch"); // not yet supported
+        desiredCapabilities.remove("cap-notify"); // unsupported
+        desiredCapabilities.remove("server-time"); // not yet supported
+        desiredCapabilities.remove("userhost-in-names"); // not yet supported
         event.getBot().sendCapReq(desiredCapabilities);
     }
 
