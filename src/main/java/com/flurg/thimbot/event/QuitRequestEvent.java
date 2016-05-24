@@ -35,7 +35,7 @@ public final class QuitRequestEvent extends Event implements OutboundEvent {
         super(bot);
         this.priority = priority;
         this.rawReason = rawReason;
-        reason = IRCStringUtil.deformat(rawReason);
+        reason = rawReason == null ? null : IRCStringUtil.deformat(rawReason);
     }
 
     public String getReason() {
