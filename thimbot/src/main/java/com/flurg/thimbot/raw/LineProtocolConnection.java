@@ -21,12 +21,7 @@ package com.flurg.thimbot.raw;
 import com.flurg.thimbot.Priority;
 import com.flurg.thimbot.ThimBot;
 
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
@@ -65,14 +60,14 @@ public final class LineProtocolConnection {
                 final LineListener listener = lineListener;
                 int res;
                 int lim = 0, pos = 0;
-                for (;;) {
+                for (; ; ) {
                     res = inputStream.read(bytes, lim, bufSize - lim);
 
                     if (res > 0) {
                         lim += res;
                     }
 
-                    for (int i = pos; i < lim; i ++) {
+                    for (int i = pos; i < lim; i++) {
                         if (bytes[i] == 13 && i < lim - 1 && bytes[i + 1] == 10) {
                             System.out.printf(">>> %s%n", new String(bytes, pos, i - pos, StandardCharsets.US_ASCII));
                             listener.handleLine(context, LineProtocolConnection.this, bytes, pos, i - pos);
