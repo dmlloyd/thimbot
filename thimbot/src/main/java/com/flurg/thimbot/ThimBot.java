@@ -18,36 +18,11 @@
 
 package com.flurg.thimbot;
 
-import static java.lang.Math.min;
+import com.flurg.thimbot.event.*;
+import com.flurg.thimbot.raw.*;
+import com.flurg.thimbot.util.IRCStringBuilder;
 
-import com.flurg.thimbot.event.AuthenticationRequestEvent;
-import com.flurg.thimbot.event.AuthenticationResponseEvent;
-import com.flurg.thimbot.event.CapabilityEndEvent;
-import com.flurg.thimbot.event.CapabilityRequestEvent;
-import com.flurg.thimbot.event.ChannelJoinRequestEvent;
-import com.flurg.thimbot.event.ChannelPartRequestEvent;
-import com.flurg.thimbot.event.ConnectEvent;
-import com.flurg.thimbot.event.ConnectRequestEvent;
-import com.flurg.thimbot.event.DisconnectEvent;
-import com.flurg.thimbot.event.DisconnectRequestEvent;
-import com.flurg.thimbot.event.Event;
-import com.flurg.thimbot.event.EventHandler;
-import com.flurg.thimbot.event.EventHandlerContext;
-import com.flurg.thimbot.event.IRCBase64;
-import com.flurg.thimbot.event.OutboundActionEvent;
-import com.flurg.thimbot.event.OutboundCTCPCommandEvent;
-import com.flurg.thimbot.event.OutboundCTCPResponseEvent;
-import com.flurg.thimbot.event.OutboundMessageEvent;
-import com.flurg.thimbot.event.OutboundNoticeEvent;
-import com.flurg.thimbot.event.QuitRequestEvent;
-import com.flurg.thimbot.raw.AckEmittableByteArrayOutputStream;
-import com.flurg.thimbot.raw.ByteOutput;
-import com.flurg.thimbot.raw.EmissionKey;
-import com.flurg.thimbot.raw.EmittableByteArrayOutputStream;
-import com.flurg.thimbot.raw.LineOutputCallback;
-import com.flurg.thimbot.raw.LineProtocolConnection;
-import com.flurg.thimbot.raw.StringEmitter;
-
+import javax.net.SocketFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -55,15 +30,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -73,8 +40,7 @@ import java.util.prefs.PreferenceChangeEvent;
 import java.util.prefs.PreferenceChangeListener;
 import java.util.prefs.Preferences;
 
-import com.flurg.thimbot.util.IRCStringBuilder;
-import javax.net.SocketFactory;
+import static java.lang.Math.min;
 
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
@@ -243,6 +209,12 @@ public final class ThimBot {
         this.address = address;
         this.socketFactory = socketFactory;
         handlers.add(new DefaultHandler());
+        if(address instanceof InetSocketAddress) {
+            InetSocketAddress inetAddress=(InetSocketAddress)address;
+            if(inetAddress.getPort()==6667) {
+                warnf("port %d looks like a plaintext connection, you may want to specify an SSL connection port%n", inetAddress.getPort());
+            }
+        }
     }
 
     public ThimBot(SocketAddress address, SocketFactory socketFactory) {
