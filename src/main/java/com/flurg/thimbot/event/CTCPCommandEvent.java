@@ -20,19 +20,25 @@ package com.flurg.thimbot.event;
 
 import java.util.List;
 
+import com.flurg.thimbot.raw.TextBuffer;
+
 /**
  *
  */
-public final class CTCPCommandEvent extends AbstractCTCPEvent {
-    public CTCPCommandEvent(final String source, final String rawMessage, final List<String> targets, final boolean outbound) {
+public final class CTCPCommandEvent extends CTCPEvent {
+    public CTCPCommandEvent(final String source, final String command, final String rawMessage, final List<String> targets, final boolean outbound) {
         super(source, command, rawMessage, targets, outbound);
+    }
+
+    CTCPCommandEvent(final NewProtocolCommandEvent event, final TextBuffer parseBuffer) {
+        super(event, parseBuffer);
     }
 
     public void dispatch(final EventHandlerContext context, final NewEventHandler eventHandler) throws Exception {
 
     }
 
-    public NewProtocolCommandEvent toProtocolCommand() {
+    public NewMessageEvent toProtocolCommand() {
 
     }
 

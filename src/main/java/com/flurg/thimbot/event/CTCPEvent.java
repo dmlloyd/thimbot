@@ -25,15 +25,15 @@ import com.flurg.thimbot.raw.TextBuffer;
 /**
  *
  */
-public abstract class AbstractCTCPEvent extends NewEvent {
+public abstract class CTCPEvent extends NewEvent {
     private final String command;
 
-    AbstractCTCPEvent(final String source, final String command, final String rawMessage, final List<String> targets, final boolean outbound) {
+    CTCPEvent(final String source, final String command, final String rawMessage, final List<String> targets, final boolean outbound) {
         super(source, rawMessage, targets, outbound);
         this.command = command;
     }
 
-    AbstractCTCPEvent(final NewProtocolCommandEvent event, final TextBuffer parseBuffer) {
+    CTCPEvent(final NewProtocolCommandEvent event, final TextBuffer parseBuffer) {
         this(event.getSource(), parseCommandFrom(parseBuffer), parseMessageFrom(parseBuffer), event.getTargets(), event.isOutbound());
     }
 

@@ -35,6 +35,10 @@ public final class NewMessageEvent extends NewProtocolCommandEvent {
         return isOutbound() && inboundEvent.isInbound() && inboundEvent instanceof NewMessageEvent && getTargets().contains(myNick) && inboundEvent.getTargets().contains(myNick) && inboundEvent.getMessage().equals(getMessage()) && myNick.equals(inboundEvent.getSourceNick());
     }
 
+    public String getCommand() {
+        return "PRIVMSG";
+    }
+
     public void writeCommand(final TextBuffer output, final List<String> targets) {
         if (getTargets().isEmpty()) {
             throw new IllegalArgumentException("At least one target is required for " + this);

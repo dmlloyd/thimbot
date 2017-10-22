@@ -32,7 +32,11 @@ public final class NewNoticeEvent extends NewProtocolCommandEvent {
     }
 
     public boolean isAcknowledgedBy(final NewEvent inboundEvent, final String myNick) {
-        return isOutbound() && inboundEvent.isInbound() && inboundEvent instanceof NewNoticeEvent && getTargets().contains(myNick) && inboundEvent.getTargets().contains(myNick) && inboundEvent.getMessage().equals(getMessage()) && myNick.equals(inboundEvent.getSourceNick());
+        return inboundEvent instanceof NewNoticeEvent && getTargets().contains(myNick) && inboundEvent.getTargets().contains(myNick) && inboundEvent.getMessage().equals(getMessage()) && myNick.equals(inboundEvent.getSourceNick());
+    }
+
+    public String getCommand() {
+        return "NOTICE";
     }
 
     public void writeCommand(final TextBuffer output, final List<String> targets) {

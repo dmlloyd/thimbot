@@ -48,5 +48,7 @@ public abstract class NewProtocolCommandEvent extends NewProtocolEvent {
         }
     }
 
+    public abstract String getCommand();
+
     public abstract void writeCommand(TextBuffer output, final List<String> targets);
 }
