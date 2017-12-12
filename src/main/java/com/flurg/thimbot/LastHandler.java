@@ -25,21 +25,21 @@ package com.flurg.thimbot;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
-import com.flurg.thimbot.event.Event;
-import com.flurg.thimbot.event.EventHandler;
-import com.flurg.thimbot.event.EventHandlerContext;
-import com.flurg.thimbot.event.inbound.CapabilityListEvent;
-import com.flurg.thimbot.event.inbound.ConnectFailedEvent;
-import com.flurg.thimbot.event.inbound.DisconnectCompleteEvent;
-import com.flurg.thimbot.event.inbound.HangUpEvent;
-import com.flurg.thimbot.event.inbound.InboundEvent;
-import com.flurg.thimbot.event.inbound.ServerPingEvent;
-import com.flurg.thimbot.event.inbound.UserPingEvent;
-import com.flurg.thimbot.event.outbound.CapabilityRequestEvent;
-import com.flurg.thimbot.event.outbound.ConnectRequestEvent;
-import com.flurg.thimbot.event.outbound.HangUpRequestEvent;
-import com.flurg.thimbot.event.outbound.OutboundPongEvent;
-import com.flurg.thimbot.event.outbound.OutboundServerPongEvent;
+import com.flurg.thimbot.event_old.Event;
+import com.flurg.thimbot.event_old.EventHandler;
+import com.flurg.thimbot.event_old.EventHandlerContext;
+import com.flurg.thimbot.event_old.inbound.CapabilityListEvent;
+import com.flurg.thimbot.event_old.inbound.ConnectFailedEvent;
+import com.flurg.thimbot.event_old.inbound.DisconnectCompleteEvent;
+import com.flurg.thimbot.event_old.inbound.HangUpEvent;
+import com.flurg.thimbot.event_old.inbound.InboundEvent;
+import com.flurg.thimbot.event_old.inbound.ServerPingEvent;
+import com.flurg.thimbot.event_old.inbound.UserPingEvent;
+import com.flurg.thimbot.event_old.outbound.CapabilityRequestEvent;
+import com.flurg.thimbot.event_old.outbound.ConnectRequestEvent;
+import com.flurg.thimbot.event_old.outbound.HangUpRequestEvent;
+import com.flurg.thimbot.event_old.outbound.OutboundPongEvent;
+import com.flurg.thimbot.event_old.outbound.OutboundServerPongEvent;
 
 /**
  * The last handler, which implements the default behavior for inbound events.  Since this is the last handler,
