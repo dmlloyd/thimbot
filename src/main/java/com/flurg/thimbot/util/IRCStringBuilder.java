@@ -166,6 +166,16 @@ public final class IRCStringBuilder {
         return this;
     }
 
+    public IRCStringBuilder append(final StringBuilder sb) {
+        b.append(sb);
+        return this;
+    }
+
+    public IRCStringBuilder append(final IRCStringBuilder sb) {
+        b.append(sb.b);
+        return this;
+    }
+
     public IRCStringBuilder append(final CharSequence s) {
         b.append(s);
         return this;
