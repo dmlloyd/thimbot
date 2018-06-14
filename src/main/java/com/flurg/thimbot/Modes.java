@@ -1,7 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- * Copyright 2017 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2017 by David M. Lloyd and contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,8 +67,28 @@ public final class Modes implements Iterable<Modes.Entry> {
         entries.add(new Entry(modeChar, argument, add));
     }
 
+    public void addMode(char modeChar, String argument) {
+        entries.add(new Entry(modeChar, argument, true));
+    }
+
     public void addMode(char modeChar, boolean add) {
         entries.add(new Entry(modeChar, null, add));
+    }
+
+    public void addMode(char modeChar) {
+        entries.add(new Entry(modeChar, null, true));
+    }
+
+    public Entry removeMode(char modeChar) {
+        final Iterator<Entry> iterator = entries.iterator();
+        while (iterator.hasNext()) {
+            final Entry entry = iterator.next();
+            if (entry.getModeChar() == modeChar) {
+                iterator.remove();
+                return entry;
+            }
+        }
+        return null;
     }
 
     public String toString() {
@@ -125,7 +143,7 @@ public final class Modes implements Iterable<Modes.Entry> {
             } else if (state == 0 && cp == '-') {
                 add = false;
             } else if (state == 0 && (cp >= '0' && cp <= '9' || cp >= 'A' && cp <= 'Z' || cp >= 'a' && cp <= 'z')) {
-                modeMap.addMode((char) cp, add);
+                modeMap.addMode(cp, add);
             } else if (state == 1) {
                 start = idx;
                 state = 2;
@@ -134,10 +152,12 @@ public final class Modes implements Iterable<Modes.Entry> {
             }
             // else skip
         }
-        final int argSize = arguments.size();
-        final int modeSize = modeMap.size();
-        for (int idx = 0; idx < argSize; idx ++) {
-            modeMap.get(modeSize - argSize + idx).setArgument(arguments.get(idx));
+        if (arguments != null) {
+            final int argSize = arguments.size();
+            final int modeSize = modeMap.size();
+            for (int idx = 0; idx < argSize; idx ++) {
+                modeMap.get(modeSize - argSize + idx).setArgument(arguments.get(idx));
+            }
         }
         return modeMap;
     }

@@ -1,7 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- * Copyright 2013 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2017 by David M. Lloyd and contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,56 +16,17 @@
 
 package com.flurg.thimbot;
 
-import com.flurg.thimbot.event_old.inbound.AccountChangeEvent;
-import com.flurg.thimbot.event_old.inbound.AuthenticationChallengeEvent;
-import com.flurg.thimbot.event_old.inbound.AuthenticationFailedEvent;
-import com.flurg.thimbot.event_old.inbound.AuthenticationMechanismsEvent;
-import com.flurg.thimbot.event_old.inbound.AuthenticationSuccessfulEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelActionEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelCurrentModeEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelNoTopicEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelTimestampEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelTopicEvent;
-import com.flurg.thimbot.util.IRCBase64;
-import com.flurg.thimbot.event_old.inbound.LoggedInEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelCTCPCommandEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelCTCPResponseEvent;
-import com.flurg.thimbot.event_old.inbound.CapabilityAckEvent;
-import com.flurg.thimbot.event_old.inbound.CapabilityListEvent;
-import com.flurg.thimbot.event_old.inbound.CapabilityNakEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelJoinEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelMessageEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelNoticeEvent;
-import com.flurg.thimbot.event_old.inbound.ChannelPartEvent;
-import com.flurg.thimbot.event_old.inbound.ErrorEvent;
-import com.flurg.thimbot.event_old.AbstractEvent;
-import com.flurg.thimbot.event_old.inbound.LoggedOutEvent;
-import com.flurg.thimbot.event_old.inbound.MOTDEndEvent;
-import com.flurg.thimbot.event_old.inbound.MOTDLineEvent;
-import com.flurg.thimbot.event_old.inbound.NickChangeEvent;
-import com.flurg.thimbot.event_old.inbound.PrivateActionEvent;
-import com.flurg.thimbot.event_old.inbound.PrivateCTCPCommandEvent;
-import com.flurg.thimbot.event_old.inbound.PrivateCTCPResponseEvent;
-import com.flurg.thimbot.event_old.inbound.PrivateMessageEvent;
-import com.flurg.thimbot.event_old.inbound.PrivateNoticeEvent;
-import com.flurg.thimbot.event_old.inbound.QuitEvent;
-import com.flurg.thimbot.event_old.inbound.ServerPingEvent;
-import com.flurg.thimbot.event_old.inbound.ServerPongEvent;
-import com.flurg.thimbot.event_old.inbound.UserAwayEvent;
-import com.flurg.thimbot.event_old.inbound.UserBackEvent;
-import com.flurg.thimbot.event_old.inbound.UserPongEvent;
-import com.flurg.thimbot.event_old.inbound.WelcomeEvent;
+import com.flurg.thimbot.event.irc.cap.*;
+import com.flurg.thimbot.event.irc.command.*;
 import com.flurg.thimbot.raw.EmittableByteArrayOutputStream;
-import com.flurg.thimbot.raw.LineListener;
 import com.flurg.thimbot.raw.LineProtocolConnection;
+import com.flurg.thimbot.util.ByteString;
 import com.flurg.thimbot.util.IRCStringUtil;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -76,7 +35,7 @@ import java.util.List;
 * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
 */
 @SuppressWarnings("SpellCheckingInspection")
-class IRCParser implements LineListener {
+class IRCParser {
 
     private static final byte[] NO_BYTES = new byte[0];
 
@@ -86,105 +45,95 @@ class IRCParser implements LineListener {
     IRCParser() {
     }
 
-    public void handleLine(final ThimBot bot, final LineProtocolConnection connection, final byte[] buffer, final int offs, final int len) {
+    public void handleLine(final Association bot, final byte[] buffer, final int offs, final int len) {
         final Input is = new Input(buffer, offs, len);
         int ch;
         final String source = parsePrefix(is);
         final String command = tokenize(is, ' ');
         switch (command) {
             case "CAP": {
-                tokenize(is, ' ');
+                final String target = tokenize(is, ' ');
                 final String subCommand = tokenize(is, ' ');
+                final CapEvent event;
                 switch (subCommand) {
                     case "LIST": {
-                        // todo active capabilities
+                        event = new CapListActiveEvent(false, source, Collections.singletonList(target));
                         break;
                     }
                     case "LS": {
-                        if (is.read() == ':') {
-                            ArrayList<String> list = new ArrayList<>();
-                            String s;
-                            while (! (s = tokenize(is, ' ')).isEmpty()) {
-                                list.add(s);
-                            }
-                            final CapabilityListEvent event = new CapabilityListEvent(bot, list);
-                            bot.dispatch(event);
-                        }
+                        event = new CapListSupportedEvent(false, source, Collections.singletonList(target));
                         break;
                     }
                     case "ACK": {
-                        if (is.read() == ':') {
-                            ArrayList<String> list = new ArrayList<>();
-                            String s;
-                            while (! (s = tokenize(is, ' ')).isEmpty()) {
-                                list.add(s);
-                            }
-                            final CapabilityAckEvent event = new CapabilityAckEvent(bot, list);
-                            bot.dispatch(event);
-                            break;
-                        }
-                    }
-                    case "NAK": {
-                        final CapabilityNakEvent event = new CapabilityNakEvent(bot);
-                        bot.dispatch(event);
+                        event = new CapAckEvent(false, source, Collections.singletonList(target));
                         break;
                     }
+                    case "NAK": {
+                        event = new CapNakEvent(false, source, Collections.singletonList(target));
+                        break;
+                    }
+                    case "NEW": {
+                        event = new CapNewEvent(source, Collections.singletonList(target));
+                        break;
+                    }
+                    case "DEL": {
+                        event = new CapDelEvent(source, Collections.singletonList(target));
+                        break;
+                    }
+                    default: {
+                        // unknown
+                        return;
+                    }
                 }
+                String s;
+                while (! (s = tokenize(is, ' ')).isEmpty()) {
+                    event.getCapabilities().add(Capability.fromString(s));
+                }
+                bot.dispatch(event);
                 break;
             }
             case "ACCOUNT": {
-                if (IRCStringUtil.isUser(source)) {
-                    final AccountChangeEvent event = new AccountChangeEvent(bot, source, tokenize(is, ' '));
-                    bot.dispatch(event);
-                }
+                final AccountEvent event = new AccountEvent(false, source, Collections.emptyList());
+                event.setAccountName(tokenize(is, ' '));
+                bot.dispatch(event);
                 break;
             }
             case "AUTHENTICATE": {
-                final String base64 = is.getRemaining(bot.getCharset());
-                if (base64.equals("+")) {
-                    final AuthenticationChallengeEvent event = new AuthenticationChallengeEvent(bot, NO_BYTES);
-                    bot.dispatch(event);
-                } else if (base64.length() == 400) {
-                    try {
-                        IRCBase64.decode(base64, 0, authBlock);
-                    } catch (IOException e) {
-                        throw new IllegalStateException();
-                    }
-                } else {
-                    try {
-                        IRCBase64.decode(base64, 0, authBlock);
-                    } catch (IOException e) {
-                        throw new IllegalStateException();
-                    }
-                    final AuthenticationChallengeEvent event = new AuthenticationChallengeEvent(bot, authBlock.toByteArray());
-                    bot.dispatch(event);
-                    authBlock.reset();
-                }
+                final AuthenticateEvent event = new AuthenticateEvent(false);
+                event.setEncodedText(is.getRemaining());
+                bot.dispatch(event);
                 break;
             }
             case "AWAY": {
-                if (IRCStringUtil.isUser(source)) {
-                    if (is.read() == ':') {
-                        final UserAwayEvent event = new UserAwayEvent(bot, source, is.getRemaining(bot.getCharset()));
-                        bot.dispatch(event);
-                    } else {
-                        final UserBackEvent event = new UserBackEvent(bot, source);
-                        bot.dispatch(event);
-                    }
+                final AwayEvent event = new AwayEvent(false, source, Collections.emptyList());
+                if (is.read() == ':') {
+                    event.setEncodedText(is.getRemaining());
                 }
+                bot.dispatch(event);
                 break;
             }
             case "INVITE": {
+                final InviteEvent event = new InviteEvent(false, source, tokenize(is, ' '), tokenize(is, ' ', ':'));
+                if (is.read() == ':') {
+                    event.setEncodedText(is.getRemaining());
+                }
+                bot.dispatch(event);
                 break;
             }
             case "JOIN": {
-                if (IRCStringUtil.isUser(source)) {
-                    final ChannelJoinEvent event = new ChannelJoinEvent(bot, source, tokenize(is, ' '));
-                    bot.dispatch(event);
+                final JoinEvent event = new JoinEvent(false, source, Collections.singletonList(tokenize(is, ' ', ':')));
+                if (is.read() == ':') {
+                    event.setEncodedText(is.getRemaining());
                 }
+                bot.dispatch(event);
                 break;
             }
             case "KICK": {
+                final KickEvent event = new KickEvent(false, source, Collections.singletonList(tokenize(is, ' ', ':')));
+                if (is.read() == ':') {
+                    event.setEncodedText(is.getRemaining());
+                }
+                bot.dispatch(event);
                 break;
             }
             case "MODE": {
@@ -196,68 +145,34 @@ class IRCParser implements LineListener {
                 << MODE #dmlloyd -m
                 >> :dmlloyd!~dmlloyd@redhat/jboss/dmlloyd MODE #dmlloyd -m
                  */
-                if (IRCStringUtil.isUser(source)) {
-                    String channel = tokenize(is, ' ');
-                    if (IRCStringUtil.isChannel(channel)) {
-                        String modes = is.getRemaining(bot.getCharset());
-                        Modes modeMap = Modes.fromString(modes);
-
-                    }
-                }
+                String channel = tokenize(is, ' ');
+                String modes = is.getRemaining().toString(StandardCharsets.US_ASCII);
+                final ModeEvent event = new ModeEvent(false, source, Collections.singletonList(channel));
+                event.setModes(Modes.fromString(modes));
+                bot.dispatch(event);
                 break;
             }
             case "NICK": {
-                if (IRCStringUtil.isUser(source) && is.read() == ':') {
-                    final NickChangeEvent event = new NickChangeEvent(bot, source, tokenize(is, ' '));
-                    bot.dispatch(event);
-                }
+                final NickEvent event = new NickEvent(false, source, tokenize(is, ' '));
+                bot.dispatch(event);
                 break;
             }
             case "NOTICE": {
-                if (IRCStringUtil.isUser(source)) {
-                    is.mark(0);
-                    ch = is.read();
-                    final String target = tokenize(is, ' ');
-                    if (is.read() == ':') {
-                        is.mark(0);
-                        if (is.read() == 1) {
-                            final String subcommand = tokenize(is, ' ');
-                            switch (subcommand) {
-                                case "PONG": {
-                                    final UserPongEvent event = new UserPongEvent(bot, source, tokenize(is, (char) 1));
-                                    bot.dispatch(event);
-                                    break;
-                                }
-                                default: {
-                                    final AbstractEvent event;
-                                    if (IRCStringUtil.isChannel(target)) {
-                                        event = new ChannelCTCPResponseEvent(bot, source, target, tokenize(is, ' '), tokenize(is, (char) 1));
-                                    } else {
-                                        event = new PrivateCTCPResponseEvent(bot, source, tokenize(is, ' '), tokenize(is, (char) 1));
-                                    }
-                                    bot.dispatch(event);
-                                    break;
-                                }
-                            }
-                        } else {
-                            is.reset();
-                            final AbstractEvent event;
-                            if (IRCStringUtil.isChannel(target)) {
-                                event = new ChannelNoticeEvent(bot, source, target, is.getRemaining(bot.getCharset()));
-                            } else {
-                                event = new PrivateNoticeEvent(bot, source, is.getRemaining(bot.getCharset()));
-                            }
-                            bot.dispatch(event);
-                        }
-                    }
+                final String targets = tokenize(is, ' ');
+                final String[] array = targets.split(",");
+                if (is.read() == ':') {
+                    final NoticeEvent event = new NoticeEvent(false, source, array.length == 1 ? Collections.singletonList(array[0]) : Arrays.asList(array));
+                    event.setEncodedText(is.getRemaining());
+                    bot.dispatch(event);
                 }
                 break;
             }
             case "PART": {
-                if (IRCStringUtil.isUser(source)) {
-                    final ChannelPartEvent event = new ChannelPartEvent(bot, source, tokenize(is, ' '), is.read() == ':' ? is.getRemaining(bot.getCharset()) : "");
-                    bot.dispatch(event);
+                final PartEvent event = new PartEvent(false, source, Collections.singletonList(tokenize(is, ' ', ':')));
+                if (is.read() == ':') {
+                    event.setEncodedText(is.getRemaining());
                 }
+                bot.dispatch(event);
                 break;
             }
             case "PING": {
@@ -269,7 +184,7 @@ class IRCParser implements LineListener {
                     is.mark(0);
                     ch = is.read();
                 }
-                final ServerPingEvent event = new ServerPingEvent(bot, is.getRemaining(StandardCharsets.ISO_8859_1));
+                final ServerPingEvent event = new ServerPingEvent(false, source, Collections.emptyList());
                 bot.dispatch(event);
                 break;
             }
@@ -282,78 +197,41 @@ class IRCParser implements LineListener {
                     is.mark(0);
                     ch = is.read();
                 }
-                final ServerPongEvent event = new ServerPongEvent(bot, is.getRemaining(StandardCharsets.ISO_8859_1));
+                final ServerPongEvent event = new ServerPongEvent(false, source, Collections.emptyList());
                 bot.dispatch(event);
                 break;
             }
             case "PRIVMSG": {
-                if (IRCStringUtil.isUser(source)) {
-                    is.mark(0);
-                    final String target = tokenize(is, ' ');
-                    if (is.read() == ':') {
-                        is.mark(0);
-                        if (is.read() == 1) {
-                            final String subcommand = tokenize(is, ' ');
-                            switch (subcommand) {
-                                case "PONG": {
-                                    final UserPongEvent event = new UserPongEvent(bot, source, tokenize(is, (char) 1));
-                                    bot.dispatch(event);
-                                    break;
-                                }
-                                case "ACTION": {
-                                    final AbstractEvent event;
-                                    if (IRCStringUtil.isChannel(target)) {
-                                        event = new ChannelActionEvent(bot, source, target, tokenize(is, (char) 1));
-                                    } else {
-                                        event = new PrivateActionEvent(bot, source, tokenize(is, (char) 1));
-                                    }
-                                    bot.dispatch(event);
-                                }
-                                default: {
-                                    final AbstractEvent event;
-                                    if (IRCStringUtil.isChannel(target)) {
-                                        event = new ChannelCTCPCommandEvent(bot, source, target, tokenize(is, ' '), tokenize(is, (char) 1));
-                                    } else {
-                                        event = new PrivateCTCPCommandEvent(bot, source, tokenize(is, ' '), tokenize(is, (char) 1));
-                                    }
-                                    bot.dispatch(event);
-                                    break;
-                                }
-                            }
-                        } else {
-                            is.reset();
-                            final AbstractEvent event;
-                            if (IRCStringUtil.isChannel(target)) {
-                                event = new ChannelMessageEvent(bot, source, target, is.getRemaining(bot.getCharset()));
-                            } else {
-                                event = new PrivateMessageEvent(bot, source, is.getRemaining(bot.getCharset()));
-                            }
-                            bot.dispatch(event);
-                        }
-                    }
-                }
-                break;
-            }
-            case "QUIT": {
-                if (IRCStringUtil.isUser(source)) {
-                    final String reason;
-                    if (is.read() == ':') {
-                        reason = is.getRemaining(bot.getCharset());
-                    } else {
-                        reason = "";
-                    }
-                    final QuitEvent event = new QuitEvent(bot, source, reason);
+                final String targets = tokenize(is, ' ');
+                final String[] array = targets.split(",");
+                if (is.read() == ':') {
+                    final MessageEvent event = new MessageEvent(false, source, array.length == 1 ? Collections.singletonList(array[0]) : Arrays.asList(array));
+                    event.setEncodedText(is.getRemaining());
                     bot.dispatch(event);
                 }
                 break;
             }
+            case "QUIT": {
+                final QuitEvent event = new QuitEvent(false, source, Collections.emptyList());
+                if (is.read() == ':') {
+                    event.setEncodedText(is.getRemaining());
+                }
+                bot.dispatch(event);
+                break;
+            }
             case "ERROR": {
-                final ErrorEvent event = new ErrorEvent(bot, is.getRemaining(bot.getCharset()));
+                final ServerErrorEvent event = new ServerErrorEvent(source, Collections.emptyList());
+                if (is.read() == ':') {
+                    event.setEncodedText(is.getRemaining());
+                }
                 bot.dispatch(event);
                 break;
             }
             case "TOPIC": {
-                // should only be client to server, ignore
+                final TopicEvent event = new TopicEvent(false, source, Collections.singletonList(tokenize(is, ' ')));
+                if (is.read() == ':') {
+                    event.setEncodedText(is.getRemaining());
+                }
                 break;
             }
             case "WALLOPS": {
@@ -664,7 +542,7 @@ class IRCParser implements LineListener {
         ch = is.read();
         if (ch != ':') {
             is.reset();
-            return "";
+            return null;
         }
         ch = is.read();
         while (ch != ' ' && ch != -1) {
@@ -692,7 +570,7 @@ class IRCParser implements LineListener {
             }
         }
         b.setLength(0);
-        return "";
+        return null;
     }
 
     public void terminated(final ThimBot bot, final LineProtocolConnection connection) {
@@ -729,6 +607,12 @@ class IRCParser implements LineListener {
             final int length = count - pos;
             if (length == 0) return "";
             return new String(buf, pos, length, charset);
+        }
+
+        public ByteString getRemaining() {
+            final int length = count - pos;
+            if (length == 0) return ByteString.EMPTY;
+            return ByteString.fromBytes(buf, pos, length);
         }
     }
 }

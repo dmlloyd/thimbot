@@ -1,7 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- * Copyright 2013 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2017 by David M. Lloyd and contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +22,7 @@ import com.flurg.thimbot.ThimBot;
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public interface LineListener {
-    void handleLine(ThimBot context, LineProtocolConnection connection, byte[] buffer, int offs, int len);
+    void handleLine(ThimBot context, byte[] buffer, int offs, int len);
 
     void terminated(ThimBot context, LineProtocolConnection connection);
 }

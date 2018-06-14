@@ -1,7 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- * Copyright 2013 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2017 by David M. Lloyd and contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +48,90 @@ public final class IRCStringUtil {
     }
 
     /**
+     * Convert a string to lowercase by the rules in <a href="https://tools.ietf.org/html/rfc2812#section-2.2">RFC 2812 §2.2</a>
+     * @param original the original string
+     * @return the lowercased string
+     */
+    public static String toIrcLowerCase(String original) {
+        final int length = original.length();
+        final char[] chars = new char[length];
+        for (int i = 0; i < length; i ++) {
+            chars[i] = toIrcLowerCase(original.charAt(i));
+        }
+        return new String(chars);
+    }
+
+    /**
+     * Convert a string to uppercase by the rules in <a href="https://tools.ietf.org/html/rfc2812#section-2.2">RFC 2812 §2.2</a>
+     * @param original the original string
+     * @return the uppercased string
+     */
+    public static String toIrcUpperCase(String original) {
+        final int length = original.length();
+        final char[] chars = new char[length];
+        for (int i = 0; i < length; i ++) {
+            chars[i] = toIrcUpperCase(original.charAt(i));
+        }
+        return new String(chars);
+    }
+
+    public static char toIrcLowerCase(char ch) {
+        switch (ch) {
+            case '[': return '{';
+            case ']': return '}';
+            case '\\': return '|';
+            case '~': return '^';
+            default: return Character.toLowerCase(ch);
+        }
+    }
+
+    public static char toIrcUpperCase(char ch) {
+        switch (ch) {
+            case '{': return '[';
+            case '}': return ']';
+            case '|': return '\\';
+            case '^': return '~';
+            default: return Character.toUpperCase(ch);
+        }
+    }
+
+    public static int toIrcLowerCase(int cp) {
+        switch (cp) {
+            case '[': return '{';
+            case ']': return '}';
+            case '\\': return '|';
+            case '~': return '^';
+            default: return Character.toLowerCase(cp);
+        }
+    }
+
+    public static int toIrcUpperCase(int cp) {
+        switch (cp) {
+            case '{': return '[';
+            case '}': return ']';
+            case '|': return '\\';
+            case '^': return '~';
+            default: return Character.toUpperCase(cp);
+        }
+    }
+
+    public static boolean equalsIrcIgnoreCase(String o1, String o2) {
+        final int length = o1.length();
+        if (length != o2.length()) return false;
+        //noinspection StringEquality
+        if (o1 == o2) return true;
+        int c1, c2;
+        for (int i = 0; i < length; i = o1.offsetByCodePoints(i, 1)) {
+            c1 = o1.codePointAt(i);
+            c2 = o2.codePointAt(i);
+            if (toIrcLowerCase(c1) != toIrcLowerCase(c2) || toIrcUpperCase(c1) != toIrcUpperCase(c2)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Determine whether the given string is a channel name.
      *
      * @param name the target name
@@ -64,7 +146,7 @@ public final class IRCStringUtil {
             case '#':
             case '!':
             case '&':
-                return true;
+                return name.length() < 50 && name.indexOf(' ') == -1 && name.indexOf(7) == -1 && name.indexOf(',') == -1;
             case '+':
             case '@':
             case '%':
@@ -72,7 +154,7 @@ public final class IRCStringUtil {
                     case '#':
                     case '!':
                     case '&':
-                        return true;
+                        return name.length() < 51 && name.indexOf(' ') == -1 && name.indexOf(7) == -1 && name.indexOf(',') == -1;
                     default:
                         return false;
                 }
@@ -143,6 +225,7 @@ public final class IRCStringUtil {
     }
 
     public static String nickOf(final String source) {
+        if (source == null) return null;
         if (source.length() < 1) {
             return "";
         }

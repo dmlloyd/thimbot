@@ -1,7 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- * Copyright 2017 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2017 by David M. Lloyd and contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,24 +16,27 @@
 
 package com.flurg.thimbot.event;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 
-import com.flurg.thimbot.charset.Charset;
-import com.flurg.thimbot.charset.Charsets;
 import com.flurg.thimbot.util.ByteString;
 
 /**
  */
-public abstract class Event {
+public abstract class Event implements Cloneable {
     private final boolean outbound;
+    private final String source;
     private final List<String> targets;
-    private long timestamp;
+    private long timestamp = System.currentTimeMillis();
     private ByteString encodedText;
-    private Charset textCharset = Charsets.utf8();
+    private Charset textCharset = StandardCharsets.UTF_8;
     private String decodedText;
 
-    protected Event(final boolean outbound, final List<String> targets) {
+    protected Event(final boolean outbound, final String source, final List<String> targets) {
+        if (targets == null) throw new IllegalArgumentException("targets is null");
+        this.source = source;
         this.outbound = outbound;
         this.targets = targets;
     }
@@ -46,6 +47,14 @@ public abstract class Event {
 
     public boolean isInbound() {
         return ! outbound;
+    }
+
+    public boolean hasSource() {
+        return source != null;
+    }
+
+    public String getSource() {
+        return source;
     }
 
     public List<String> getTargets() {
@@ -60,12 +69,18 @@ public abstract class Event {
         this.timestamp = timestamp;
     }
 
+    public void copyTextFrom(final Event event) {
+        encodedText = event.encodedText;
+        decodedText = event.decodedText;
+        textCharset = event.textCharset;
+    }
+
     public String getDecodedText() {
         String decodedText = this.decodedText;
         if (decodedText == null) {
             ByteString encodedText = this.encodedText;
             if (encodedText == null) {
-                return "";
+                return null;
             }
             decodedText = this.decodedText = encodedText.toString(textCharset);
         }
@@ -82,7 +97,7 @@ public abstract class Event {
         if (encodedText == null) {
             String decodedText = this.decodedText;
             if (decodedText == null) {
-                return ByteString.EMPTY;
+                return null;
             }
             encodedText = this.encodedText = ByteString.fromString(decodedText, textCharset);
         }
@@ -99,8 +114,6 @@ public abstract class Event {
     }
 
     public void setTextCharset(final Charset textCharset) {
-        if (textCharset == this.textCharset) return;
-        this.decodedText = null;
         this.textCharset = textCharset;
     }
 
@@ -128,5 +141,15 @@ public abstract class Event {
 
     public String toString() {
         return toString(new StringBuilder()).toString();
+    }
+
+    public abstract void accept(final EventHandlerContext context, final EventHandler eventHandler);
+
+    public Event clone() {
+        try {
+            return (Event) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

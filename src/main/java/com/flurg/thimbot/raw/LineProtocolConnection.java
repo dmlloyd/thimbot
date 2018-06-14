@@ -1,7 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- * Copyright 2013 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2017 by David M. Lloyd and contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,7 +73,7 @@ public final class LineProtocolConnection {
                     for (int i = pos; i < lim; i ++) {
                         if (bytes[i] == 13 && i < lim - 1 && bytes[i + 1] == 10) {
                             System.out.printf(">>> %s%n", new String(bytes, pos, i - pos, StandardCharsets.US_ASCII));
-                            listener.handleLine(context, LineProtocolConnection.this, bytes, pos, i - pos);
+                            listener.handleLine(context, bytes, pos, i - pos);
                             pos = i + 2;
                         }
                     }
@@ -89,7 +87,7 @@ public final class LineProtocolConnection {
                     if (res == -1) {
                         if (lim > 0) {
                             System.out.printf(">>> %s%n", new String(bytes, 0, lim, StandardCharsets.US_ASCII));
-                            listener.handleLine(context, LineProtocolConnection.this, bytes, 0, lim);
+                            listener.handleLine(context, bytes, 0, lim);
                         }
                         signalShutdown();
                         return;

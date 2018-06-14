@@ -1,7 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- * Copyright 2013 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2017 by David M. Lloyd and contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,31 +16,8 @@
 
 package com.flurg.thimbot;
 
-import com.flurg.thimbot.event_old.outbound.AuthenticationRequestEvent;
-import com.flurg.thimbot.event_old.outbound.AuthenticationResponseEvent;
-import com.flurg.thimbot.event_old.outbound.CapabilityEndEvent;
-import com.flurg.thimbot.event_old.outbound.CapabilityListRequestEvent;
-import com.flurg.thimbot.event_old.outbound.CapabilityRequestEvent;
-import com.flurg.thimbot.event_old.outbound.ChannelJoinRequestEvent;
-import com.flurg.thimbot.event_old.outbound.ChannelModeRequestEvent;
-import com.flurg.thimbot.event_old.outbound.ChannelPartRequestEvent;
-import com.flurg.thimbot.event_old.outbound.ChannelTopicChangeRequestEvent;
-import com.flurg.thimbot.event_old.outbound.ChannelTopicRequestEvent;
-import com.flurg.thimbot.event_old.inbound.ConnectEvent;
-import com.flurg.thimbot.event_old.outbound.ConnectRequestEvent;
-import com.flurg.thimbot.event_old.inbound.HangUpEvent;
-import com.flurg.thimbot.event_old.AbstractEvent;
-import com.flurg.thimbot.event_old.EventHandler;
-import com.flurg.thimbot.event_old.EventHandlerContext;
-import com.flurg.thimbot.event_old.outbound.OutboundActionEvent;
-import com.flurg.thimbot.event_old.outbound.OutboundCTCPCommandEvent;
-import com.flurg.thimbot.event_old.outbound.OutboundCTCPResponseEvent;
-import com.flurg.thimbot.event_old.outbound.OutboundMessageEvent;
-import com.flurg.thimbot.event_old.outbound.OutboundNoticeEvent;
-import com.flurg.thimbot.event_old.outbound.OutboundPingEvent;
-import com.flurg.thimbot.event_old.outbound.OutboundPongEvent;
-import com.flurg.thimbot.event_old.outbound.OutboundServerPongEvent;
-import com.flurg.thimbot.event_old.outbound.QuitRequestEvent;
+import com.flurg.thimbot.event.*;
+import com.flurg.thimbot.event.connection.*;
 import com.flurg.thimbot.raw.AckEmittableByteArrayOutputStream;
 import com.flurg.thimbot.raw.EmissionKey;
 import com.flurg.thimbot.raw.EmittableByteArrayOutputStream;

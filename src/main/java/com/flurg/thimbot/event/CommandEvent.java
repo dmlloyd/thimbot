@@ -1,7 +1,5 @@
 /*
- * JBoss, Home of Professional Open Source.
- * Copyright 2017 Red Hat, Inc., and individual contributors
- * as indicated by the @author tags.
+ * Copyright 2017 by David M. Lloyd and contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +18,22 @@ package com.flurg.thimbot.event;
 
 import java.util.List;
 
+import com.flurg.thimbot.event.irc.ProtocolEvent;
+
 /**
  */
 public abstract class CommandEvent extends ProtocolEvent {
-    protected CommandEvent(final boolean outbound, final List<String> targets) {
-        super(outbound, targets);
+    protected CommandEvent(final boolean outbound, final String source, final List<String> targets) {
+        super(outbound, source, targets);
     }
 
+    public abstract String getCommand();
 
+    protected void addToString(final StringBuilder b) {
+        b.append(' ').append(getCommand());
+    }
+
+    public CommandEvent clone() {
+        return (CommandEvent) super.clone();
+    }
 }
